@@ -1,6 +1,6 @@
-# dsh-output-dock bundle patch: mounts the dual-half plugin row.
-# The node half registers the file-content route; the browser half ships via
-# exports["./client"], discovered through the package.json dsh.client declaration.
+# Output Dock bundle patch: mounts the explicit publication tool and its client.
+# The node half validates published results and serves approved workspace files;
+# the browser half renders per-session, user-opened result tabs.
 - insert:
     - id: output-dock
       name: dsh-output-dock

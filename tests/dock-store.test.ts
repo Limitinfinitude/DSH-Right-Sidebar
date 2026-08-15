@@ -83,4 +83,26 @@ describe('output dock UI store', () => {
     expect(a).toHaveBeenCalledOnce()
     expect(b).not.toHaveBeenCalled()
   })
+
+  it('removes only a session that was previously observed and then deleted', () => {
+    const store = createOutputDockUiStore(memoryStorage())
+    store.open('s1', 'a\u0000one')
+    store.noteSessions(['s1', 's2'])
+    store.noteSessions(['s2'])
+    expect(store.get('s1')).toEqual({ open: false, opened: [], active: null })
+    expect(store.get('s2')).toEqual({ open: false, opened: [], active: null })
+  })
+
+  it('does not prune persisted state during initial catalog population', () => {
+    const storage = memoryStorage({
+      'dsh-output-dock:v3': JSON.stringify({
+        version: 3,
+        sessions: { s1: { open: false, opened: ['a\u0000one'], active: 'a\u0000one' } },
+      }),
+    })
+    const store = createOutputDockUiStore(storage)
+    store.noteSessions([])
+    store.noteSessions(['s2'])
+    expect(store.get('s1').opened).toEqual(['a\u0000one'])
+  })
 })

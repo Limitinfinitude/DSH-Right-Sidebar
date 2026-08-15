@@ -14,6 +14,7 @@ export interface OutputDockUiStore {
   restore(sessionId: string): void
   reconcile(sessionId: string, localKeys: ReadonlySet<string>): void
   removeSession(sessionId: string): void
+  noteSessions(ids: readonly string[]): void
 }
 
 const STORAGE_KEY = 'dsh-output-dock:v3'
@@ -52,6 +53,7 @@ function hydrate(storage: Storage): Readonly<Record<string, SessionDockState>> {
 
 export function createOutputDockUiStore(storage: Storage): OutputDockUiStore {
   let sessions = hydrate(storage)
+  let observedSessionIds: ReadonlySet<string> | null = null
   const listeners = new Map<string, Set<() => void>>()
 
   const write = (sessionId: string, next: SessionDockState | null): void => {
@@ -128,6 +130,28 @@ export function createOutputDockUiStore(storage: Storage): OutputDockUiStore {
     },
     removeSession(sessionId) {
       write(sessionId, null)
+    },
+    noteSessions(ids) {
+      if (observedSessionIds === null) {
+        if (ids.length > 0) observedSessionIds = new Set(ids)
+        return
+      }
+      const nextObserved = new Set(ids)
+      const removed = [...observedSessionIds].filter(id => !nextObserved.has(id))
+      observedSessionIds = nextObserved
+      const ownedRemoved = removed.filter(id => sessions[id] !== undefined)
+      if (ownedRemoved.length === 0) return
+      const changed = { ...sessions }
+      for (const id of ownedRemoved) delete changed[id]
+      sessions = changed
+      try {
+        storage.setItem(STORAGE_KEY, JSON.stringify({ version: 3, sessions }))
+      } catch {
+        // Persistence failure must not break the live dock.
+      }
+      for (const id of ownedRemoved) {
+        for (const listener of listeners.get(id) ?? []) listener()
+      }
     },
   }
 }

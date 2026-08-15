@@ -1,8 +1,8 @@
 import { ROUTE_PATH } from '../route.ts'
 
 /** Browser URL for one workspace-confined output file. */
-export function fileUrl(path: string): string {
-  return `${ROUTE_PATH}?path=${encodeURIComponent(path)}`
+export function fileUrl(path: string, revision = 0): string {
+  return `${ROUTE_PATH}?path=${encodeURIComponent(path)}&v=${revision}`
 }
 
 function isSiblingReference(href: string): boolean {
@@ -30,7 +30,7 @@ function normalizeSibling(sourcePath: string, reference: string): string {
 }
 
 /** Resolve one resource reference found inside a preview document. */
-export function resolveResourceUrl(sourcePath: string, href: string): string {
+export function resolveResourceUrl(sourcePath: string, href: string, revision = 0): string {
   if (!isSiblingReference(href)) return href
   const hashAt = href.indexOf('#')
   const beforeHash = hashAt === -1 ? href : href.slice(0, hashAt)
@@ -39,11 +39,11 @@ export function resolveResourceUrl(sourcePath: string, href: string): string {
   const reference = queryAt === -1 ? beforeHash : beforeHash.slice(0, queryAt)
   const query = queryAt === -1 ? '' : beforeHash.slice(queryAt + 1)
   const target = normalizeSibling(sourcePath, reference)
-  return `${fileUrl(target)}${query === '' ? '' : `&${query}`}${hash}`
+  return `${fileUrl(target, revision)}${query === '' ? '' : `&${query}`}${hash}`
 }
 
 /** Normalize a sanitized SVG document for a contained sidebar preview. */
-export function prepareSvg(_sourcePath: string, source: string): string {
+export function prepareSvg(_sourcePath: string, source: string, revision = 0): string {
   const doc = new DOMParser().parseFromString(source, 'image/svg+xml')
   const svg = doc.documentElement
   if (svg.localName !== 'svg' || doc.querySelector('parsererror') !== null) return source
@@ -67,34 +67,34 @@ export function prepareSvg(_sourcePath: string, source: string): string {
 
   for (const node of svg.querySelectorAll('[href]')) {
     const href = node.getAttribute('href')
-    if (href !== null) node.setAttribute('href', resolveResourceUrl(_sourcePath, href))
+    if (href !== null) node.setAttribute('href', resolveResourceUrl(_sourcePath, href, revision))
   }
   for (const node of svg.querySelectorAll('[*|href]')) {
     const href = node.getAttribute('xlink:href')
-    if (href !== null) node.setAttribute('xlink:href', resolveResourceUrl(_sourcePath, href))
+    if (href !== null) node.setAttribute('xlink:href', resolveResourceUrl(_sourcePath, href, revision))
   }
   return new XMLSerializer().serializeToString(svg)
 }
 
-function rewriteHtmlResources(sourcePath: string, doc: Document): void {
+function rewriteHtmlResources(sourcePath: string, doc: Document, revision: number): void {
   for (const attribute of ['src', 'href', 'poster'] as const) {
     for (const node of doc.querySelectorAll(`[${attribute}]`)) {
       const value = node.getAttribute(attribute)
-      if (value !== null) node.setAttribute(attribute, resolveResourceUrl(sourcePath, value))
+      if (value !== null) node.setAttribute(attribute, resolveResourceUrl(sourcePath, value, revision))
     }
   }
 }
 
 /** Rewrite relative assets in an HTML preview document. */
-export function prepareHtml(sourcePath: string, source: string): string {
+export function prepareHtml(sourcePath: string, source: string, revision = 0): string {
   const doc = new DOMParser().parseFromString(source, 'text/html')
-  rewriteHtmlResources(sourcePath, doc)
+  rewriteHtmlResources(sourcePath, doc, revision)
   return `<!doctype html>${doc.documentElement.outerHTML}`
 }
 
 /** Rewrite relative assets in sanitized Markdown-rendered HTML. */
-export function prepareHtmlFragment(sourcePath: string, source: string): string {
+export function prepareHtmlFragment(sourcePath: string, source: string, revision = 0): string {
   const doc = new DOMParser().parseFromString(source, 'text/html')
-  rewriteHtmlResources(sourcePath, doc)
+  rewriteHtmlResources(sourcePath, doc, revision)
   return doc.body.innerHTML
 }

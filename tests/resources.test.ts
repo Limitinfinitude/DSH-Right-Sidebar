@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { kindOfPath } from '../src/formats.ts'
-import { prepareHtml, prepareSvg, resolveResourceUrl } from '../src/client/resources.ts'
+import { fileUrl, prepareHtml, prepareSvg, resolveResourceUrl } from '../src/client/resources.ts'
 
 describe('output format classification', () => {
   it.each([
@@ -24,14 +24,19 @@ describe('output format classification', () => {
 })
 
 describe('preview resource URLs', () => {
+  it('keys file requests by publication revision', () => {
+    expect(fileUrl('reports/chart.svg', 17))
+      .toBe('/api/output-dock/file?path=reports%2Fchart.svg&v=17')
+  })
+
   it('routes Windows sibling resources through the workspace file endpoint', () => {
     expect(resolveResourceUrl('D:\\work\\docs\\report.md', '../images/chart.png'))
-      .toBe('/api/output-dock/file?path=D%3A%2Fwork%2Fimages%2Fchart.png')
+      .toBe('/api/output-dock/file?path=D%3A%2Fwork%2Fimages%2Fchart.png&v=0')
   })
 
   it('routes POSIX sibling resources and preserves query/hash suffixes', () => {
     expect(resolveResourceUrl('/work/docs/report.html', './assets/chart.svg?v=2#plot'))
-      .toBe('/api/output-dock/file?path=%2Fwork%2Fdocs%2Fassets%2Fchart.svg&v=2#plot')
+      .toBe('/api/output-dock/file?path=%2Fwork%2Fdocs%2Fassets%2Fchart.svg&v=0&v=2#plot')
   })
 
   it.each([
@@ -60,7 +65,7 @@ describe('SVG preview normalization', () => {
     expect(svg.hasAttribute('height')).toBe(false)
     expect(svg.getAttribute('preserveAspectRatio')).toBe('xMidYMid meet')
     expect(image?.getAttribute('href'))
-      .toBe('/api/output-dock/file?path=D%3A%2Fwork%2Fassets%2Fchart.png')
+      .toBe('/api/output-dock/file?path=D%3A%2Fwork%2Fassets%2Fchart.png&v=0')
   })
 })
 
@@ -73,9 +78,9 @@ describe('HTML preview resources', () => {
     ].join(''))
     const doc = new DOMParser().parseFromString(html, 'text/html')
     expect(doc.querySelector('img')?.getAttribute('src'))
-      .toBe('/api/output-dock/file?path=%2Fwork%2Fsite%2Fimages%2Fchart.png')
+      .toBe('/api/output-dock/file?path=%2Fwork%2Fsite%2Fimages%2Fchart.png&v=0')
     expect(doc.querySelectorAll('a')[0]?.getAttribute('href'))
-      .toBe('/api/output-dock/file?path=%2Fwork%2Fsite%2Fnotes.txt')
+      .toBe('/api/output-dock/file?path=%2Fwork%2Fsite%2Fnotes.txt&v=0')
     expect(doc.querySelectorAll('a')[1]?.getAttribute('href')).toBe('https://example.com')
   })
 })
