@@ -58,7 +58,7 @@ No new session event type is required. Output Dock derives publications from DSH
 
 The client validates the recorded arguments again because the session log is a durable input boundary. Failed, aborted, incomplete, and malformed calls produce no publication.
 
-One conversation definition publishes each successful call into a dedicated `outputDock` session view. Every published entry retains its engine-resolved turn location. The view builder folds events in sequence order and replaces an earlier item when `(workId, resultId)` repeats. The latest successful event supplies the label, kind, resource, turn, and revision sequence.
+One conversation definition publishes each successful call into a dedicated `outputDock` session view. Every published entry retains its engine-resolved turn location. The view snapshot keeps immutable publication history for closing-turn result actions and separately folds the current result set in sequence order, replacing an earlier current item when `(workId, resultId)` repeats. The latest successful event supplies the current label, kind, resource, turn, and revision sequence without removing the action attached to an earlier completed reply.
 
 This design preserves results across reload and historical-session replay, works in both native and Code Mode, and avoids a second persistence mechanism for result content.
 
