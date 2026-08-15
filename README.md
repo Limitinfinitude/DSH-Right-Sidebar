@@ -2,35 +2,35 @@
 
 English | [中文](README.zh.md)
 
-A native output sidebar for DeepSeek Harness. Agent-produced documents, diagrams,
-images, pages, and code stay beside the conversation and open at the moment they
-are created.
+A native output sidebar for DeepSeek Harness. Produced files stay beside the
+conversation in a resizable, session-aware preview workspace.
 
 ![Output Dock overview](docs/images/show1.png)
 
 ## Overview
 
-Output Dock closes the gap between producing a file and inspecting it. The newest
-useful output opens directly in DSH's resizable right column, while every produced
-file remains available from the same session-scoped list.
+Output Dock derives files directly from successful mutation tool records. Documents,
+visuals, pages, and PDFs open automatically in DSH's right column. Source and
+configuration files remain available without stealing the current preview.
 
 The panel follows DSH's theme and locale, yields the column to tool details when
 needed, and can be collapsed or restored from the right edge.
 
 ## Highlights
 
-- Selects and renders the newest output automatically
-- Rebuilds the output list when a historical session is opened
-- Switches between files without leaving the conversation
-- Copies paths or content, downloads files, and supports pin and hide controls
-- Checks Markdown links, SVG structure, HTML parsing, and image loading locally
-- Fits fixed-size SVGs through `viewBox` normalization and safe resource rewriting
-- Uses a full-height drawer on compact screens without horizontal overflow
+- Keeps a permanent, collapsible launcher on the right edge
+- Uses closeable, draggable browser-style tabs with per-session persisted order
+- Restores closed tabs only when the same file is produced again
+- Adapts HTML, Markdown, text, images, and SVGs to narrow sidebar widths
+- Copies paths or content, downloads files, and opens the containing folder
+- Runs Markdown, SVG, HTML, and image checks internally without adding UI noise
+- Rebuilds outputs when switching or reopening sessions
 
 ## Visual Output
 
 Markdown, SVG, HTML, PDF, and image previews are rendered inside the dock. Relative
-resources stay anchored to the produced file instead of breaking at the plugin route.
+resources stay anchored to the produced file, while fixed-width pages and long text
+are constrained to the available column width.
 
 ![SVG preview in Output Dock](docs/images/show2.png)
 
@@ -52,9 +52,9 @@ Refresh the DSH Web session after installation.
 ## Use
 
 1. Ask DSH to create a document, diagram, image, page, or source file.
-2. Output Dock opens the latest preview in the native right column.
-3. Use the file selector to inspect earlier outputs from the session.
-4. Use the footer controls to copy, download, pin, or hide an entry.
+2. Previewable results open automatically; source files are added quietly.
+3. Switch, close, or drag tabs to arrange the current session's outputs.
+4. Use the footer controls to copy, reveal, download, pin, or hide an entry.
 
 ## Supported Formats
 
@@ -84,7 +84,7 @@ npm run build
 
 - File reads are limited to the boot workspace and registered DSH workspaces.
 - HTML previews use a script-free sandbox.
-- Pin and hide preferences are local to the browser; session output history is rebuilt from the log.
+- Viewing preferences are stored in the browser; output history is rebuilt from the session log.
 - Deployed development servers are not embedded yet; this release previews their produced files.
 
 ## License
