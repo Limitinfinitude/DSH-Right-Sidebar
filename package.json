@@ -1,7 +1,7 @@
 {
-  "name": "dsh-output-dock",
+  "name": "dsh-right-sidebar",
   "version": "0.2.0",
-  "description": "Codex-style output dock for DSH Web: agent-produced md/svg/image/html files are collected, previewed inline, QC-checked, and archived in one panel",
+  "description": "Codex-style right sidebar for DSH Web with automatic output collection, responsive previews, and session-aware tabs",
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",

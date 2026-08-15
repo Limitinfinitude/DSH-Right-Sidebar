@@ -1,15 +1,15 @@
-# Output Dock
+# DSH Right Sidebar
 
 [English](README.md) | 中文
 
 为 DeepSeek Harness 打造的原生输出侧边栏。生成的文件会留在对话旁，形成一个
 可缩放、跟随会话切换的预览工作区。
 
-![Output Dock 总览](docs/images/show1.png)
+![DSH Right Sidebar 总览](docs/images/show1.png)
 
 ## 概览
 
-Output Dock 直接从成功的文件修改记录中收集产物。文档、视觉内容、页面和 PDF
+DSH Right Sidebar 直接从成功的文件修改记录中收集产物。文档、视觉内容、页面和 PDF
 会自动在 DSH 右栏打开；源码与配置文件会保留在标签中，但不会抢走当前预览。
 
 面板跟随 DSH 的主题和语言，需要查看工具详情时会交还右栏，也可以手动收起并从
@@ -30,15 +30,15 @@ Output Dock 直接从成功的文件修改记录中收集产物。文档、视�
 Markdown、SVG、HTML、PDF 和图片都可以在侧边栏内预览。相对资源会以产物文件
 自身为基准解析，固定宽度页面和长文本也会约束在当前侧栏宽度内。
 
-![Output Dock 中的 SVG 预览](docs/images/show2.png)
+![DSH Right Sidebar 中的 SVG 预览](docs/images/show2.png)
 
 ## 安装
 
-Output Dock 当前要求 DSH Web 提供会话级 `details.overlay` 插槽和具名详情栏 API。
+DSH Right Sidebar 当前要求 DSH Web 提供会话级 `details.overlay` 插槽和具名详情栏 API。
 
 ```sh
-git clone https://github.com/Limitinfinitude/DSH-Output-Dock.git
-cd DSH-Output-Dock
+git clone https://github.com/Limitinfinitude/DSH-Right-Sidebar.git
+cd DSH-Right-Sidebar
 npm install
 npm run build
 dsh plugin --profile web add .

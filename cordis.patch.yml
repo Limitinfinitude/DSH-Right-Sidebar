@@ -1,6 +1,6 @@
-# dsh-output-dock bundle patch: mounts the dual-half plugin row.
+# dsh-right-sidebar bundle patch: mounts the dual-half plugin row.
 # The node half registers the file-content route; the browser half ships via
 # exports["./client"], discovered through the package.json dsh.client declaration.
 - insert:
     - id: output-dock
-      name: dsh-output-dock
+      name: dsh-right-sidebar

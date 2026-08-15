@@ -9,7 +9,7 @@
  */
 import type { UserConfig } from 'tsdown'
 
-const ID = 'dsh-output-dock'
+const ID = 'dsh-right-sidebar'
 
 /**
  * Browser platform modules seeded into the shell's frozen module table
@@ -65,7 +65,7 @@ const clientHalf: UserConfig = {
       // Bundle purity gate, mirroring the harness preset: platform modules
       // stay external, everything else under @deepseek-ai/* must be
       // type-only (erased before this gate runs) or a build error.
-      name: 'dsh-output-dock-purity',
+      name: 'dsh-right-sidebar-purity',
       resolveId(source: string) {
         if (!source.startsWith('@deepseek-ai/')) return null
         if (CLIENT_EXTERNALS.includes(source)) return null

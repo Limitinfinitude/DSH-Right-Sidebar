@@ -1,15 +1,15 @@
-# Output Dock
+# DSH Right Sidebar
 
 English | [中文](README.zh.md)
 
-A native output sidebar for DeepSeek Harness. Produced files stay beside the
+A native right sidebar for DeepSeek Harness. Produced files stay beside the
 conversation in a resizable, session-aware preview workspace.
 
-![Output Dock overview](docs/images/show1.png)
+![DSH Right Sidebar overview](docs/images/show1.png)
 
 ## Overview
 
-Output Dock derives files directly from successful mutation tool records. Documents,
+DSH Right Sidebar derives files directly from successful mutation tool records. Documents,
 visuals, pages, and PDFs open automatically in DSH's right column. Source and
 configuration files remain available without stealing the current preview.
 
@@ -32,16 +32,16 @@ Markdown, SVG, HTML, PDF, and image previews are rendered inside the dock. Relat
 resources stay anchored to the produced file, while fixed-width pages and long text
 are constrained to the available column width.
 
-![SVG preview in Output Dock](docs/images/show2.png)
+![SVG preview in DSH Right Sidebar](docs/images/show2.png)
 
 ## Install
 
-Output Dock currently targets a DSH Web build that exposes the session-scoped
+DSH Right Sidebar currently targets a DSH Web build that exposes the session-scoped
 `details.overlay` slot and named details-surface APIs.
 
 ```sh
-git clone https://github.com/Limitinfinitude/DSH-Output-Dock.git
-cd DSH-Output-Dock
+git clone https://github.com/Limitinfinitude/DSH-Right-Sidebar.git
+cd DSH-Right-Sidebar
 npm install
 npm run build
 dsh plugin --profile web add .

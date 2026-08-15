@@ -1,5 +1,5 @@
 /**
- * dsh-output-dock, browser half. Registers the produced-file conversation
+ * dsh-right-sidebar, browser half. Registers the produced-file conversation
  * definition, the per-session dock view builder, the dictionaries, the
  * stylesheet, the native details-column panel, and its inactive edge launcher.
  * Everything rides the caller's fiber: plugin unload removes the panel, the

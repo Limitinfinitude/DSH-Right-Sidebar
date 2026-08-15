@@ -1,5 +1,5 @@
 /**
- * dsh-output-dock client contracts: entry/snapshot types plus the
+ * dsh-right-sidebar client contracts: entry/snapshot types plus the
  * declaration-merged business keys the runtime engine types against.
  */
 import type { ConversationLocation, ConversationViewNode } from '@deepseek-ai/dsh-client-runtime/client';
