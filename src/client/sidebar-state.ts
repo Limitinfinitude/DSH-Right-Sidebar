@@ -10,7 +10,7 @@ export function directoryOfPath(path: string): string {
 
 /** Rich, user-facing formats may reveal themselves; source-like text stays quiet. */
 export function shouldAutoOpen(entry: OutputEntry): boolean {
-  return entry.kind !== 'text'
+  return entry.kind !== 'text' && entry.kind !== 'code'
 }
 
 /** Visible tab order: pinned first, then newest activity, without mutating input. */

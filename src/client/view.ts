@@ -9,7 +9,7 @@ import type {
 import type {
   OutputDockSnapshot, OutputDockTurnPayload, OutputDockViewNode, OutputEntry,
 } from './contract.ts'
-import { EMPTY_OUTPUT_DOCK_SNAPSHOT } from './contract.ts'
+import { EMPTY_OUTPUT_DOCK_SNAPSHOT, isDockVisibleKind } from './contract.ts'
 import { kindOfPath } from './collect.ts'
 
 export class OutputDockViewBuilder implements ConversationViewBuilder<OutputDockViewNode, OutputDockSnapshot> {
@@ -35,7 +35,7 @@ export class OutputDockViewBuilder implements ConversationViewBuilder<OutputDock
       if (payload === undefined) continue
       for (const produced of payload.produced) {
         const kind = kindOfPath(produced.path)
-        if (kind === null) continue
+        if (kind === null || !isDockVisibleKind(kind)) continue
         const previous = entries.get(produced.path)
         entries.set(produced.path, previous === undefined
           ? {

@@ -9,7 +9,7 @@ import type {
   ConversationNodeContext, ConversationNodeDefinition, ConversationMatch, ToolResultNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-client-runtime/client'
-import type { OutputDockTurnPayload, OutputDockViewNode } from './contract.ts'
+import { isDockVisibleKind, type OutputDockTurnPayload, type OutputDockViewNode } from './contract.ts'
 import { kindOfPath } from '../formats.ts'
 
 export { kindOfPath } from '../formats.ts'
@@ -90,7 +90,10 @@ export const outputDockDefinition: ConversationNodeDefinition<OutputDockState> =
     const callId = String(match.event.data.message.source.callId)
     const additions = producedPaths(context.state.calls.get(callId) ?? null)
       .map(path => ({ seq: match.event.seq, path }))
-      .filter(entry => kindOfPath(entry.path) !== null)
+      .filter(entry => {
+        const kind = kindOfPath(entry.path)
+        return kind !== null && isDockVisibleKind(kind)
+      })
     return additions.length === 0
       ? context.state
       : { ...context.state, produced: [...context.state.produced, ...additions] }
