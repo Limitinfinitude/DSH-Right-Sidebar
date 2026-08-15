@@ -2,42 +2,32 @@
 
 English | [中文](README.zh.md)
 
-A native output sidebar for DeepSeek Harness. Agent-produced documents, diagrams,
-images, pages, and code stay beside the conversation and open at the moment they
-are created.
+A focused result workspace for DeepSeek Harness. Finished documents and visuals
+open in DSH's native right column; deployed pages open in a regular browser tab.
 
 ![Output Dock overview](docs/images/show1.png)
 
-## Overview
+## What It Does
 
-Output Dock closes the gap between producing a file and inspecting it. The newest
-useful output opens directly in DSH's resizable right column, while every produced
-file remains available from the same session-scoped list.
+- The agent publishes finished, inspectable results explicitly.
+- Results appear beside the completed reply and open only when selected.
+- Local documents and visuals use session-scoped horizontal tabs in Outputs.
+- Deployed pages open in a regular browser tab; development servers are never embedded.
+- Source files, configuration, and incidental project files are not collected.
+- Tabs, focus, and collapsed state follow the active DSH session.
 
-The panel follows DSH's theme and locale, yields the column to tool details when
-needed, and can be collapsed or restored from the right edge.
+Output Dock does not interrupt the conversation when a result is produced. A
+background session cannot open the panel or steal focus.
 
-## Highlights
+## Preview
 
-- Selects and renders the newest output automatically
-- Rebuilds the output list when a historical session is opened
-- Switches between files without leaving the conversation
-- Copies paths or content, downloads files, and supports pin and hide controls
-- Checks Markdown links, SVG structure, HTML parsing, and image loading locally
-- Fits fixed-size SVGs through `viewBox` normalization and safe resource rewriting
-- Uses a full-height drawer on compact screens without horizontal overflow
+Markdown, MDX, SVG, images, HTML, PDF, text, CSV, and TSV files can be previewed
+inside Outputs. Relative resources remain anchored to their published file, and
+SVG content is sanitized and normalized for contained rendering.
 
-## Visual Output
-
-Markdown, SVG, HTML, PDF, and image previews are rendered inside the dock. Relative
-resources stay anchored to the produced file instead of breaking at the plugin route.
-
-![SVG preview in Output Dock](docs/images/show2.png)
+![Output Dock preview](docs/images/show2.png)
 
 ## Install
-
-Output Dock currently targets a DSH Web build that exposes the session-scoped
-`details.overlay` slot and named details-surface APIs.
 
 ```sh
 git clone https://github.com/Limitinfinitude/DSH-Output-Dock.git
@@ -47,30 +37,36 @@ npm run build
 dsh plugin --profile web add .
 ```
 
-Refresh the DSH Web session after installation.
+Refresh DSH Web after installation.
 
 ## Use
 
-1. Ask DSH to create a document, diagram, image, page, or source file.
-2. Output Dock opens the latest preview in the native right column.
-3. Use the file selector to inspect earlier outputs from the session.
-4. Use the footer controls to copy, download, pin, or hide an entry.
+1. Ask DSH to create a finished document, visual, or deployed application.
+2. Select the result button beside the completed reply.
+3. Local results open in Outputs; deployed links open in a browser tab.
+4. Use the horizontal tabs to switch, refresh, download, or close local results.
+5. Collapse Outputs when finished. Returning to the session restores its tabs.
 
-## Supported Formats
+## Supported Results
 
 | Category | Formats |
 |---|---|
-| Documents | Markdown, MDX, PDF |
+| Documents | Markdown, MDX, PDF, HTML, HTM, TXT, CSV, TSV |
 | Visuals | SVG, PNG, JPEG, WebP, GIF, AVIF, BMP |
-| Web | HTML, HTM |
-| Text and code | Common source, configuration, data, and plain-text extensions |
+| Deployed applications | Absolute HTTP or HTTPS URL |
 
-## How It Works
+## DSH Integration
 
-The Node half exposes a workspace-confined, read-only file route. The client half
-derives output paths from mutation tool records, folds them into a per-session view,
-and registers the viewer in DSH's native details column. Preview content is sanitized
-before rendering; quality checks are deterministic and use no model calls.
+Output Dock requires a DSH Web build with:
+
+- the session-scoped `details.overlay` slot;
+- the named details-surface API (`openDetails`, `closeDetails`, and surface state);
+- `conversation.chat.turnTail` owner access to the per-session `views` store;
+- durable Native and Code Mode tool lifecycle events.
+
+The Node half registers `output_dock_publish` and a workspace-confined read-only
+file route. The client folds successful publications into a durable per-session
+view, renders reply actions, and opens only results selected by the user.
 
 ## Development
 
@@ -80,12 +76,8 @@ npm run typecheck
 npm run build
 ```
 
-## Current Limitations
-
-- File reads are limited to the boot workspace and registered DSH workspaces.
-- HTML previews use a script-free sandbox.
-- Pin and hide preferences are local to the browser; session output history is rebuilt from the log.
-- Deployed development servers are not embedded yet; this release previews their produced files.
+Local file reads are limited to the DSH boot workspace and registered workspaces.
+HTML previews run in a script-free sandbox.
 
 ## License
 

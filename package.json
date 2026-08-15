@@ -1,7 +1,7 @@
 {
   "name": "dsh-output-dock",
-  "version": "0.2.0",
-  "description": "Codex-style output dock for DSH Web: agent-produced md/svg/image/html files are collected, previewed inline, QC-checked, and archived in one panel",
+  "version": "0.3.0",
+  "description": "Session-scoped result workspace for DSH Web with explicit publications, reply actions, local preview tabs, and browser links",
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",

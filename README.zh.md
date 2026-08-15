@@ -2,39 +2,30 @@
 
 [English](README.md) | 中文
 
-为 DeepSeek Harness 打造的原生输出侧边栏。Agent 生成的文档、图表、图片、
-页面和代码会留在会话旁，并在创建完成时直接打开。
+为 DeepSeek Harness 打造的专注型结果工作区。完成的文档和视觉产物在 DSH 原生
+右栏中打开；部署后的网页使用普通浏览器标签打开。
 
 ![Output Dock 总览](docs/images/show1.png)
 
-## 概览
+## 核心行为
 
-Output Dock 打通了“生成文件”和“查看结果”之间的断点。最新的有效产物会直接
-显示在 DSH 可拖动缩放的原生右栏中，同时每个已生成文件仍保留在当前会话的列表里。
+- Agent 只显式发布已经完成、值得查看的结果。
+- 结果显示在已完成回复旁，只有用户点击后才会打开。
+- 本地文档和视觉产物在 Outputs 中使用会话级横向标签。
+- 部署后的网页在普通浏览器标签中打开，不嵌入开发服务器。
+- 不收集源码、配置文件和项目中的附带文件。
+- 已开标签、当前标签和收起状态跟随当前 DSH 会话切换。
 
-面板跟随 DSH 的主题和语言，需要查看工具详情时会交还右栏，也可以手动收起并从
-右侧边缘恢复。
+结果产生时 Output Dock 不会打断对话；后台会话也不能打开右栏或抢占焦点。
 
-## 主要能力
+## 预览
 
-- 自动选择并渲染最新产物
-- 打开历史会话时重新构建该会话的输出列表
-- 无需离开对话即可切换文件
-- 支持复制路径、复制内容、下载、置顶和隐藏
-- 在本地检查 Markdown 链接、SVG 结构、HTML 解析和图片加载
-- 通过 `viewBox` 归一化与安全资源重写适配固定尺寸 SVG
-- 在窄屏使用全高抽屉，不产生横向溢出
+Outputs 支持预览 Markdown、MDX、SVG、图片、HTML、PDF、文本、CSV 和 TSV。
+相对资源始终以发布文件为基准解析；SVG 会在安全净化和尺寸归一化后渲染。
 
-## 可视化输出
-
-Markdown、SVG、HTML、PDF 和图片都可以在侧边栏内预览。相对资源会以产物文件
-自身为基准解析，不会因为经过插件路由而失效。
-
-![Output Dock 中的 SVG 预览](docs/images/show2.png)
+![Output Dock 预览](docs/images/show2.png)
 
 ## 安装
-
-Output Dock 当前要求 DSH Web 提供会话级 `details.overlay` 插槽和具名详情栏 API。
 
 ```sh
 git clone https://github.com/Limitinfinitude/DSH-Output-Dock.git
@@ -44,29 +35,35 @@ npm run build
 dsh plugin --profile web add .
 ```
 
-安装后刷新 DSH Web 会话。
+安装后刷新 DSH Web。
 
 ## 使用
 
-1. 让 DSH 创建文档、图表、图片、页面或源码文件。
-2. Output Dock 会在原生右栏中自动打开最新预览。
-3. 使用文件选择器查看当前会话之前生成的产物。
-4. 使用底部控件复制、下载、置顶或隐藏条目。
+1. 让 DSH 制作完成的文档、视觉产物或已部署应用。
+2. 点击完成回复旁的结果按钮。
+3. 本地结果会进入 Outputs；部署链接会打开浏览器标签。
+4. 使用横向标签切换结果，并可刷新、下载或关闭当前结果。
+5. 使用完毕后收起 Outputs；回到该会话时会恢复它自己的标签。
 
-## 支持格式
+## 支持的结果
 
 | 类别 | 格式 |
 |---|---|
-| 文档 | Markdown、MDX、PDF |
+| 文档 | Markdown、MDX、PDF、HTML、HTM、TXT、CSV、TSV |
 | 视觉内容 | SVG、PNG、JPEG、WebP、GIF、AVIF、BMP |
-| Web | HTML、HTM |
-| 文本与代码 | 常见源码、配置、数据和纯文本扩展名 |
+| 已部署应用 | 绝对 HTTP 或 HTTPS 地址 |
 
-## 工作原理
+## DSH 集成要求
 
-Node 侧提供限定在工作区内的只读文件路由；客户端从修改工具记录中派生产物路径，
-聚合成会话级视图，并把查看器注册到 DSH 原生详情栏。所有预览内容都会在渲染前
-经过净化，质量检查完全由确定性规则完成，不调用模型。
+Output Dock 需要 DSH Web 提供：
+
+- 会话级 `details.overlay` 插槽；
+- 具名详情栏 API（`openDetails`、`closeDetails` 和当前 surface 状态）；
+- `conversation.chat.turnTail` owner 对会话 `views` store 的只读访问；
+- Native 与 Code Mode 的持久化工具生命周期事件。
+
+Node 侧注册 `output_dock_publish` 和限定在工作区内的只读文件路由；客户端把成功
+发布折叠为持久的会话级视图，在回复旁渲染入口，并且只打开用户选择的结果。
 
 ## 开发
 
@@ -76,12 +73,8 @@ npm run typecheck
 npm run build
 ```
 
-## 当前限制
-
-- 文件读取范围限定在启动工作区和 DSH 已注册工作区内。
-- HTML 使用禁用脚本的沙箱预览。
-- 置顶和隐藏偏好保存在当前浏览器；会话输出历史从日志重新构建。
-- 当前版本尚未嵌入已部署的开发服务器，只预览项目生成的文件。
+本地文件读取范围限定在 DSH 启动工作区和已注册工作区内；HTML 在禁用脚本的
+沙箱中预览。
 
 ## 许可证
 
