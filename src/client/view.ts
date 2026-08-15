@@ -1,58 +1,69 @@
-/**
- * Per-session incremental view builder: folds each turn's published payload
- * into a first-seen-deduped flat entry list. Replace clears; apply merges
- * only the changed turns.
- */
 import type {
-  ConversationViewBuilder, ConversationViewDefinition,
+  ConversationViewBuilder,
+  ConversationViewDefinition,
 } from '@deepseek-ai/dsh-client-runtime/client'
-import type {
-  OutputDockSnapshot, OutputDockTurnPayload, OutputDockViewNode, OutputEntry,
+import { kindOfPath } from '../formats.ts'
+import {
+  EMPTY_OUTPUT_DOCK_SNAPSHOT,
+  publicationKey,
+  type OutputDockSnapshot,
+  type OutputDockViewNode,
+  type PublishedOutput,
 } from './contract.ts'
-import { EMPTY_OUTPUT_DOCK_SNAPSHOT } from './contract.ts'
-import { kindOfPath } from './collect.ts'
+
+function outputFromNode(node: OutputDockViewNode): PublishedOutput | null {
+  const location = node.location
+  if (location.kind !== 'turn' && location.kind !== 'step') return null
+  const publication = node.data.publication
+  return {
+    ...publication,
+    key: publicationKey(publication.workId, publication.resultId),
+    previewKind: publication.path === undefined ? null : kindOfPath(publication.path),
+    turn: location.turn.turn,
+    revision: node.anchorSeq,
+  }
+}
 
 export class OutputDockViewBuilder implements ConversationViewBuilder<OutputDockViewNode, OutputDockSnapshot> {
   readonly empty = EMPTY_OUTPUT_DOCK_SNAPSHOT
-  private turns = new Map<number, OutputDockTurnPayload>()
+  private readonly nodes = new Map<string, OutputDockViewNode>()
 
   replace(input: { readonly nodes: readonly OutputDockViewNode[] }): OutputDockSnapshot {
-    this.turns.clear()
-    for (const node of input.nodes) this.turns.set(node.data.turn, node.data)
+    this.nodes.clear()
+    for (const node of input.nodes) this.nodes.set(node.key, node)
     return this.snapshot()
   }
 
   apply(input: { readonly upserts: readonly OutputDockViewNode[] }): OutputDockSnapshot {
-    for (const node of input.upserts) this.turns.set(node.data.turn, node.data)
+    for (const node of input.upserts) this.nodes.set(node.key, node)
     return this.snapshot()
   }
 
   private snapshot(): OutputDockSnapshot {
-    const entries = new Map<string, OutputEntry>()
-    const order = [...this.turns.keys()].sort((left, right) => left - right)
-    for (const turn of order) {
-      const payload = this.turns.get(turn)
-      if (payload === undefined) continue
-      for (const produced of payload.produced) {
-        const kind = kindOfPath(produced.path)
-        if (kind === null) continue
-        const previous = entries.get(produced.path)
-        entries.set(produced.path, previous === undefined
-          ? {
-            path: produced.path,
-            kind,
-            firstTurn: turn,
-            lastTurn: turn,
-            lastSeq: produced.seq,
-          }
-          : { ...previous, lastTurn: turn, lastSeq: produced.seq })
-      }
-    }
-    return { entries: [...entries.values()] }
+    const history = [...this.nodes.values()]
+      .sort((left, right) => left.anchorSeq - right.anchorSeq)
+      .flatMap((node) => {
+        const output = outputFromNode(node)
+        return output === null ? [] : [output]
+      })
+    const current = new Map<string, PublishedOutput>()
+    for (const output of history) current.set(output.key, output)
+    return { history, entries: [...current.values()] }
   }
 }
 
-/** The dock's conversation view target definition. */
+export function publicationsForTurn(
+  snapshot: OutputDockSnapshot,
+  turn: number,
+  closingSeq: number,
+): readonly PublishedOutput[] {
+  const latest = new Map<string, PublishedOutput>()
+  for (const entry of snapshot.history) {
+    if (entry.turn === turn && entry.revision <= closingSeq) latest.set(entry.key, entry)
+  }
+  return [...latest.values()]
+}
+
 export const outputDockViewDefinition: ConversationViewDefinition<OutputDockViewNode, OutputDockSnapshot> = {
   target: 'outputDock',
   create: () => new OutputDockViewBuilder(),
