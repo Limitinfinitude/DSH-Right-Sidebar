@@ -58,13 +58,13 @@ No new session event type is required. Output Dock derives publications from DSH
 
 The client validates the recorded arguments again because the session log is a durable input boundary. Failed, aborted, incomplete, and malformed calls produce no publication.
 
-One conversation definition publishes the successful publications into turn data for the assistant turn-tail entry and into a dedicated `outputDock` session view. The view builder folds events in sequence order and replaces an earlier item when `(workId, resultId)` repeats. The latest successful event supplies the label, kind, resource, and revision sequence.
+One conversation definition publishes each successful call into a dedicated `outputDock` session view. Every published entry retains its engine-resolved turn location. The view builder folds events in sequence order and replaces an earlier item when `(workId, resultId)` repeats. The latest successful event supplies the label, kind, resource, turn, and revision sequence.
 
 This design preserves results across reload and historical-session replay, works in both native and Code Mode, and avoids a second persistence mechanism for result content.
 
 ## Conversation Surface
 
-Output Dock registers a new entry in `conversation.chat.turnTail`. Its selector claims a closing assistant turn only when that turn contains one or more successful publications.
+Output Dock registers a new entry in `conversation.chat.turnTail`. DSH's `TurnTailOwnerProps` is extended with the current session's read-only conversation view store. Its selector reads `outputDock`, filters entries to the owner's closing turn and sequence, and claims the chain only when that turn contains one or more successful publications. This small host extension is required because Code Mode dispatch events have engine-resolved locations but intentionally do not duplicate `turn` and `step` fields in their event payloads.
 
 The row contains compact result actions, not a file list. Each action shows the contextual title and a restrained kind icon. Local results call the dock controller with their result identity. Link results call the browser's external navigation capability with `noopener,noreferrer` behavior. The row does not expose filesystem paths or URLs as primary labels.
 
@@ -171,4 +171,4 @@ The acceptance scenario uses two sessions. Session A publishes and opens two loc
 
 This is the `0.3.0` behavior change. The README and screenshots will be updated after the implementation is visually verified. The existing public `0.2.0` release remains the baseline until the new interaction passes tests and browser review.
 
-The local DSH named details-column changes are a prerequisite and stay in the separate `D:\deepseek-harness` worktree. Output Dock will not commit or rewrite unrelated DSH changes as part of the plugin release.
+The local DSH named details-column changes and the read-only turn-tail view-store owner field are prerequisites and stay in the separate `D:\deepseek-harness` worktree. Output Dock will not commit or rewrite unrelated DSH changes as part of the plugin release.
