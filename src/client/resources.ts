@@ -85,10 +85,37 @@ function rewriteHtmlResources(sourcePath: string, doc: Document): void {
   }
 }
 
+const HTML_FIT_CSS = `
+html { width: 100%; overflow-x: hidden; }
+body { width: 100%; min-width: 0; margin: 0; overflow-x: hidden; overflow-wrap: anywhere; }
+*, *::before, *::after { box-sizing: border-box; }
+img, svg, video, canvas, iframe, table, pre { max-width: 100%; }
+img, svg, video, canvas { height: auto; }
+main, section, article, header, footer, nav, aside, div, form { min-width: 0; max-width: 100%; }
+pre, code { white-space: pre-wrap; overflow-wrap: anywhere; }
+table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+th, td { overflow-wrap: anywhere; }
+`
+
+function makeHtmlResponsive(doc: Document): void {
+  let viewport = doc.head.querySelector<HTMLMetaElement>('meta[name="viewport"]')
+  if (viewport === null) {
+    viewport = doc.createElement('meta')
+    viewport.name = 'viewport'
+    doc.head.prepend(viewport)
+  }
+  viewport.content = 'width=device-width, initial-scale=1'
+  const style = doc.createElement('style')
+  style.dataset.outputDockFit = ''
+  style.textContent = HTML_FIT_CSS
+  doc.head.append(style)
+}
+
 /** Rewrite relative assets in an HTML preview document. */
 export function prepareHtml(sourcePath: string, source: string): string {
   const doc = new DOMParser().parseFromString(source, 'text/html')
   rewriteHtmlResources(sourcePath, doc)
+  makeHtmlResponsive(doc)
   return `<!doctype html>${doc.documentElement.outerHTML}`
 }
 

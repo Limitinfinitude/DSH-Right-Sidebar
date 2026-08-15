@@ -9,6 +9,7 @@ export declare const zh: {
     'dock.expand': string;
     'dock.collapse': string;
     'dock.chooseFile': string;
+    'dock.closeTab': string;
     'dock.preview': string;
     'dock.copyPath': string;
     'dock.copyContent': string;
@@ -18,6 +19,7 @@ export declare const zh: {
     'dock.unhide': string;
     'dock.clearHidden': string;
     'dock.download': string;
+    'dock.reveal': string;
     'dock.turn': string;
     'dock.copied': string;
     'dock.hiddenCount': string;

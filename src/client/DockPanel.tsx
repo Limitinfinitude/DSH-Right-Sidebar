@@ -1,7 +1,7 @@
 /** Native details-column output viewer and its inactive edge launcher. */
 import {
-  AlertTriangle, Check, ChevronDown, Copy, Download, EyeOff, Files,
-  LoaderCircle, PanelRightClose, Pin, PinOff, RotateCcw,
+  Check, Clipboard, Download, EyeOff, Files, FolderOpen, Link,
+  PanelRightClose, Pin, PinOff, RotateCcw, X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ISessions, SessionFace } from '@deepseek-ai/dsh-client-runtime/client'
@@ -9,13 +9,18 @@ import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-cli
 import { basename } from './collect.ts'
 import type { OutputDockSnapshot, OutputEntry } from './contract.ts'
 import { EMPTY_OUTPUT_DOCK_SNAPSHOT } from './contract.ts'
+import {
+  EMPTY_SESSION_PERSISTED, loadDockState, saveDockState,
+  type PersistedState, type SessionPersistedState,
+} from './dock-persistence.ts'
 import type { NS, OutputDockKey } from './locales.ts'
 import { Preview } from './preview.tsx'
-import type { QcIssue, QcResult } from './qc.ts'
-import { QC_LOADING } from './qc.ts'
+import type { QcResult } from './qc.ts'
 import { mergeQcResult } from './qc-state.ts'
 import { fileUrl } from './resources.ts'
-import { reconcileSelection } from './sidebar-state.ts'
+import {
+  directoryOfPath, orderedTabs, reconcileSelection, reorderTab, shouldAutoOpen, visibleTabs,
+} from './sidebar-state.ts'
 import {
   dockRenderTarget, getCompactViewport, subscribeCompactViewport,
 } from './viewport.ts'
@@ -40,28 +45,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-interface PersistedState {
-  readonly pinned: readonly string[]
-  readonly hidden: readonly string[]
-}
-
 const OUTPUT_SURFACE = 'output-dock'
-const PERSIST_KEY = 'dsh-output-dock:v2'
-const EMPTY_PERSISTED: PersistedState = { pinned: [], hidden: [] }
-
-function loadPersisted(): PersistedState {
-  try {
-    const raw = localStorage.getItem(PERSIST_KEY)
-    if (raw === null) return EMPTY_PERSISTED
-    const parsed = JSON.parse(raw) as Partial<PersistedState>
-    return {
-      pinned: Array.isArray(parsed.pinned) ? parsed.pinned.filter(x => typeof x === 'string') : [],
-      hidden: Array.isArray(parsed.hidden) ? parsed.hidden.filter(x => typeof x === 'string') : [],
-    }
-  } catch {
-    return EMPTY_PERSISTED
-  }
-}
 
 /** Subscribe to just the output view snapshot of one session. */
 function useDockSnapshot(session: SessionFace | undefined): OutputDockSnapshot {
@@ -96,38 +80,14 @@ function useCompactViewport(): boolean {
   return useSyncExternalStore(subscribeCompactViewport, getCompactViewport, () => false)
 }
 
-type SharedInject = { sessions: ISessions; layout: OutputDockLayout }
+type SharedInject = {
+  sessions: ISessions
+  layout: OutputDockLayout
+  openPath(path: string): void
+}
 type PanelProps = PropsRuntime<'details.overlay'> & PropsLocale<typeof NS> & InjectFace<SharedInject>
 type LauncherProps = PropsRuntime<'shell.overlay'> & PropsLocale<typeof NS> & InjectFace<SharedInject>
-type SurfaceProps = Pick<PanelProps, 'layout' | 'sessions' | 't' | 'useSessions'>
-
-function issueText(t: PanelProps['t'], issue: QcIssue): string {
-  switch (issue.code) {
-    case 'md-broken-link': return t('qc.brokenLink', { count: String(issue.count ?? 0) })
-    case 'md-unbalanced-fence': return t('qc.unbalancedFence')
-    case 'svg-parse': return t('qc.svgParse')
-    case 'svg-no-viewbox': return t('qc.svgNoViewBox')
-    case 'svg-sanitized': return t('qc.svgSanitized')
-    case 'image-failed': return t('qc.imageFailed')
-    case 'html-parse': return t('qc.htmlParse', { count: String(issue.count ?? 0) })
-    case 'file-read': return t('qc.fileRead')
-  }
-}
-
-function QcSummary({ result, t }: { result: QcResult; t: PanelProps['t'] }): React.JSX.Element {
-  if (result.level === 'loading') {
-    return <div className="dsh-od-qc" data-level="loading"><LoaderCircle size={14} aria-hidden />{t('qc.loading')}</div>
-  }
-  if (result.level === 'ok') {
-    return <div className="dsh-od-qc" data-level="ok"><Check size={14} aria-hidden />{t('qc.ok')}</div>
-  }
-  return (
-    <div className="dsh-od-qc" data-level={result.level}>
-      <AlertTriangle size={14} aria-hidden />
-      <span>{result.issues.map(issue => issueText(t, issue)).join(' · ')}</span>
-    </div>
-  )
-}
+type SurfaceProps = Pick<PanelProps, 'layout' | 'sessions' | 't' | 'useSessions' | 'openPath'>
 
 function currentSession(props: SurfaceProps): SessionFace | undefined {
   const current = props.useSessions(state => state.current)
@@ -158,11 +118,13 @@ function IconButton(props: {
 
 function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
   const { layout, sessions, t } = props
-  const snapshot = useDockSnapshot(currentSession(props))
+  const sessionId = props.useSessions(state => state.current)
+  const session = sessionId === undefined ? undefined : sessions.binding(sessionId)?.session
+  const snapshot = useDockSnapshot(session)
   const surface = useDetailsSurface(layout)
-  const [persisted, setPersisted] = useState<PersistedState>(loadPersisted)
+  const [persisted, setPersisted] = useState<PersistedState>(() => loadDockState(localStorage))
+  const [draggedPath, setDraggedPath] = useState<string | null>(null)
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
-  const [fileMenuOpen, setFileMenuOpen] = useState(false)
   const [qcByPath, setQcByPath] = useState<ReadonlyMap<string, QcResult>>(new Map())
   const [copied, setCopied] = useState<'path' | 'content' | null>(null)
   const selectedRef = useRef<string | null>(null)
@@ -170,32 +132,54 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
 
   const pinned = useMemo(() => new Set(persisted.pinned), [persisted.pinned])
   const hidden = useMemo(() => new Set(persisted.hidden), [persisted.hidden])
-  const visible = useMemo(() => snapshot.entries
-    .filter(entry => !hidden.has(entry.path))
-    .sort((left, right) =>
-      Number(pinned.has(right.path)) - Number(pinned.has(left.path))
-      || right.lastSeq - left.lastSeq), [hidden, pinned, snapshot.entries])
+  const sessionState = sessionId === undefined
+    ? EMPTY_SESSION_PERSISTED
+    : persisted.sessions[sessionId] ?? EMPTY_SESSION_PERSISTED
+  const closedAt = useMemo(
+    () => new Map(Object.entries(sessionState.closedAt)),
+    [sessionState.closedAt],
+  )
+  const automaticOrder = useMemo(
+    () => visibleTabs(snapshot.entries, hidden, pinned, closedAt),
+    [closedAt, hidden, pinned, snapshot.entries],
+  )
+  const visible = useMemo(
+    () => orderedTabs(automaticOrder, sessionState.order),
+    [automaticOrder, sessionState.order],
+  )
 
   useEffect(() => {
-    localStorage.setItem(PERSIST_KEY, JSON.stringify(persisted))
+    saveDockState(localStorage, persisted)
   }, [persisted])
+
+  const updateSessionState = (update: (state: SessionPersistedState) => SessionPersistedState): void => {
+    if (sessionId === undefined) return
+    setPersisted(previous => ({
+      ...previous,
+      sessions: {
+        ...previous.sessions,
+        [sessionId]: update(previous.sessions[sessionId] ?? EMPTY_SESSION_PERSISTED),
+      },
+    }))
+  }
 
   useEffect(() => {
     const next = reconcileSelection(visible, selectedRef.current, seenSeqRef.current)
     selectedRef.current = next.path
     seenSeqRef.current = next.seenSeq
     setSelectedPath(next.path)
-    if (next.hasNewOutput) layout.openDetails(OUTPUT_SURFACE)
+    const selectedNewOutput = visible.find(entry => entry.path === next.path)
+    if (next.hasNewOutput && selectedNewOutput !== undefined && shouldAutoOpen(selectedNewOutput)) {
+      layout.openDetails(OUTPUT_SURFACE)
+    }
   }, [layout, visible])
 
   const selected = visible.find(entry => entry.path === selectedPath) ?? null
-  const qc = selected === null ? QC_LOADING : qcByPath.get(selected.path) ?? QC_LOADING
   const hiddenCount = hidden.size
 
   const select = (path: string): void => {
     selectedRef.current = path
     setSelectedPath(path)
-    setFileMenuOpen(false)
   }
   const setQc = useCallback((path: string, result: QcResult) => {
     setQcByPath(previous => mergeQcResult(previous, path, result))
@@ -241,16 +225,68 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
   const clearHidden = (): void => {
     setPersisted(previous => ({ ...previous, hidden: [] }))
   }
+  const closeTab = (entry: OutputEntry): void => {
+    updateSessionState(previous => ({
+      ...previous,
+      closedAt: { ...previous.closedAt, [entry.path]: entry.lastSeq },
+    }))
+  }
+  const dropTab = (targetPath: string, sourcePath: string | null): void => {
+    if (sourcePath === null || sourcePath === '') return
+    const order = reorderTab(visible.map(entry => entry.path), sourcePath, targetPath)
+    updateSessionState(previous => ({ ...previous, order }))
+    setDraggedPath(null)
+  }
 
   if (surface !== OUTPUT_SURFACE) return null
 
   return (
     <section className="dsh-od-panel" aria-label={t('dock.title')}>
       <header className="dsh-od-header">
-        <div className="dsh-od-heading">
-          <Files size={16} aria-hidden />
-          <span>{t('dock.title')}</span>
-          <span className="dsh-od-count">{snapshot.entries.length}</span>
+        <div className="dsh-od-tabs" role="tablist" aria-label={t('dock.chooseFile')}>
+          {visible.map(entry => (
+            <div
+              className="dsh-od-tab-wrap"
+              data-active={entry.path === selectedPath || undefined}
+              data-dragging={entry.path === draggedPath || undefined}
+              key={entry.path}
+              title={entry.path}
+              onDragOver={(event) => {
+                event.preventDefault()
+                event.dataTransfer.dropEffect = 'move'
+              }}
+              onDrop={(event) => {
+                event.preventDefault()
+                dropTab(entry.path, draggedPath ?? event.dataTransfer.getData('text/plain'))
+              }}
+              onDragEnd={() => { setDraggedPath(null) }}
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={entry.path === selectedPath}
+                className="dsh-od-tab"
+                draggable
+                onClick={() => { select(entry.path) }}
+                onDragStart={(event) => {
+                  event.dataTransfer.effectAllowed = 'move'
+                  event.dataTransfer.setData('text/plain', entry.path)
+                  setDraggedPath(entry.path)
+                }}
+              >
+                <span>{basename(entry.path)}</span>
+              </button>
+              <button
+                type="button"
+                className="dsh-od-tab-close"
+                aria-label={t('dock.closeTab', { name: basename(entry.path) })}
+                title={t('dock.closeTab', { name: basename(entry.path) })}
+                onClick={() => { closeTab(entry) }}
+              >
+                <X size={13} aria-hidden />
+              </button>
+            </div>
+          ))}
         </div>
         <IconButton label={t('dock.collapse')} onClick={() => { layout.closeDetails() }}>
           <PanelRightClose size={16} aria-hidden />
@@ -271,44 +307,6 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
         )
         : (
           <>
-            <div className="dsh-od-filebar">
-              <button
-                type="button"
-                className="dsh-od-file-picker"
-                onClick={() => { setFileMenuOpen(open => !open) }}
-                aria-expanded={fileMenuOpen}
-                aria-haspopup="listbox"
-              >
-                <span className={`dsh-od-kind dsh-od-kind-${selected.kind}`}>{selected.kind}</span>
-                <span className="dsh-od-file-copy">
-                  <span className="dsh-od-file-name">{basename(selected.path)}</span>
-                  <span className="dsh-od-file-path" title={selected.path}>{selected.path}</span>
-                </span>
-                <ChevronDown size={15} aria-hidden />
-              </button>
-              {fileMenuOpen && (
-                <div className="dsh-od-file-menu" role="listbox" aria-label={t('dock.chooseFile')}>
-                  {visible.map(entry => (
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={entry.path === selected.path}
-                      className="dsh-od-file-option"
-                      key={entry.path}
-                      onClick={() => { select(entry.path) }}
-                    >
-                      <span className={`dsh-od-kind dsh-od-kind-${entry.kind}`}>{entry.kind}</span>
-                      <span className="dsh-od-option-copy">
-                        <span>{basename(entry.path)}</span>
-                        <small>{t('dock.turn', { turn: String(entry.lastTurn) })}</small>
-                      </span>
-                      {pinned.has(entry.path) && <Pin size={13} aria-label={t('dock.pin')} />}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
             <div className="dsh-od-preview-canvas">
               <Preview
                 key={selected.path}
@@ -323,17 +321,19 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
             </div>
 
             <footer className="dsh-od-footer">
-              <QcSummary result={qc} t={t} />
               <div className="dsh-od-toolbar">
                 <IconButton label={copied === 'path' ? t('dock.copied') : t('dock.copyPath')} onClick={() => { void copy(selected.path, 'path') }}>
-                  {copied === 'path' ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
+                  {copied === 'path' ? <Check size={16} aria-hidden /> : <Link size={16} aria-hidden />}
                 </IconButton>
                 <IconButton
                   label={copied === 'content' ? t('dock.copied') : t('dock.copyContent')}
                   onClick={() => { void copyContent(selected) }}
                   disabled={selected.kind === 'image' || selected.kind === 'pdf'}
                 >
-                  {copied === 'content' ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
+                  {copied === 'content' ? <Check size={16} aria-hidden /> : <Clipboard size={16} aria-hidden />}
+                </IconButton>
+                <IconButton label={t('dock.reveal')} onClick={() => { props.openPath(directoryOfPath(selected.path)) }}>
+                  <FolderOpen size={16} aria-hidden />
                 </IconButton>
                 <IconButton label={t('dock.download')} onClick={() => { download(selected) }}>
                   <Download size={16} aria-hidden />
@@ -367,7 +367,6 @@ export function OutputDockLauncher(props: LauncherProps): React.JSX.Element | nu
   const session = currentSession(props)
   const snapshot = useDockSnapshot(session)
   const surface = useDetailsSurface(props.layout)
-  if (session === undefined || snapshot.entries.length === 0) return null
   if (surface === OUTPUT_SURFACE) {
     return target === 'mobile'
       ? <div className="dsh-od-mobile-shell"><OutputDockSurface {...props} /></div>
@@ -382,7 +381,7 @@ export function OutputDockLauncher(props: LauncherProps): React.JSX.Element | nu
       title={props.t('dock.expand')}
     >
       <Files size={17} aria-hidden />
-      <span>{snapshot.entries.length}</span>
+      {snapshot.entries.length > 0 && <span>{snapshot.entries.length}</span>}
     </button>
   )
 }

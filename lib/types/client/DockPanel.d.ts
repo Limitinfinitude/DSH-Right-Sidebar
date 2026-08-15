@@ -27,6 +27,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 type SharedInject = {
     sessions: ISessions;
     layout: OutputDockLayout;
+    openPath(path: string): void;
 };
 type PanelProps = PropsRuntime<'details.overlay'> & PropsLocale<typeof NS> & InjectFace<SharedInject>;
 type LauncherProps = PropsRuntime<'shell.overlay'> & PropsLocale<typeof NS> & InjectFace<SharedInject>;

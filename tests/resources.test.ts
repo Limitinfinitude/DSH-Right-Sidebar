@@ -78,4 +78,13 @@ describe('HTML preview resources', () => {
       .toBe('/api/output-dock/file?path=%2Fwork%2Fsite%2Fnotes.txt')
     expect(doc.querySelectorAll('a')[1]?.getAttribute('href')).toBe('https://example.com')
   })
+
+  it('injects a responsive viewport and sidebar-fit rules into fixed-width pages', () => {
+    const html = prepareHtml('/work/site/report.html', '<main style="width: 1200px">Wide</main>')
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    expect(doc.querySelector('meta[name="viewport"]')?.getAttribute('content'))
+      .toBe('width=device-width, initial-scale=1')
+    expect(doc.querySelector('style[data-output-dock-fit]')?.textContent)
+      .toContain('max-width: 100%')
+  })
 })
