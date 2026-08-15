@@ -5,6 +5,8 @@ export declare function directoryOfPath(path: string): string;
 export declare function shouldAutoOpen(entry: OutputEntry): boolean;
 /** Visible tab order: pinned first, then newest activity, without mutating input. */
 export declare function visibleTabs(entries: readonly OutputEntry[], hidden: ReadonlySet<string>, pinned?: ReadonlySet<string>, closedAt?: ReadonlyMap<string, number>): readonly OutputEntry[];
+/** Session history stays available after closing tabs; explicitly hidden files do not. */
+export declare function catalogEntries(entries: readonly OutputEntry[], hidden: ReadonlySet<string>): readonly OutputEntry[];
 /** Apply manual order to known tabs while leaving newly produced entries in front. */
 export declare function orderedTabs(entries: readonly OutputEntry[], order: readonly string[]): readonly OutputEntry[];
 /** Move the dragged tab immediately before the drop target. */

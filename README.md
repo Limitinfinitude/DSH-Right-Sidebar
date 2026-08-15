@@ -1,43 +1,40 @@
 # DSH Right Sidebar
 
-English | [中文](README.zh.md)
+中文 | [English](README.en.md)
 
-A native right sidebar for DeepSeek Harness. Produced files stay beside the
-conversation in a resizable, session-aware preview workspace.
+为 DeepSeek Harness 打造的原生输出侧边栏。生成的文件会留在对话旁，形成一个
+可缩放、跟随会话切换的预览工作区。
 
-![DSH Right Sidebar overview](docs/images/show1.png)
+![DSH Right Sidebar 总览](docs/images/show1.png)
 
-## Overview
+## 概览
 
-DSH Right Sidebar derives files directly from successful mutation tool records. Documents,
-visuals, pages, and PDFs open automatically in DSH's right column. Source and
-configuration files remain available without stealing the current preview.
+DSH Right Sidebar 直接从成功的文件修改记录中收集产物。文档、视觉内容、页面和 PDF
+会自动在 DSH 右栏打开；源码与配置文件会保留在标签中，但不会抢走当前预览。
 
-The panel follows DSH's theme and locale, yields the column to tool details when
-needed, and can be collapsed or restored from the right edge.
+面板跟随 DSH 的主题和语言，需要查看工具详情时会交还右栏，也可以手动收起并从
+右侧边缘恢复。
 
-## Highlights
+## 主要能力
 
-- Keeps a permanent, collapsible launcher on the right edge
-- Uses closeable, draggable browser-style tabs with per-session persisted order
-- Restores closed tabs only when the same file is produced again
-- Adapts HTML, Markdown, text, images, and SVGs to narrow sidebar widths
-- Copies paths or content, downloads files, and opens the containing folder
-- Runs Markdown, SVG, HTML, and image checks internally without adding UI noise
-- Rebuilds outputs when switching or reopening sessions
+- 右侧入口常驻，可随时展开或收起
+- 使用可关闭、可拖拽的浏览器式标签，并按会话保存顺序
+- 从底部的本会话产物目录重新打开已关闭标签，目录超过 7 项时内部滚动
+- HTML、Markdown、文本、图片和 SVG 自动适配窄侧栏
+- 支持复制路径、复制内容、下载以及打开所在目录
+- 在后台完成 Markdown、SVG、HTML 和图片检查，不增加界面噪声
+- 切换或重新打开会话时恢复对应产物
 
-## Visual Output
+## 可视化输出
 
-Markdown, SVG, HTML, PDF, and image previews are rendered inside the dock. Relative
-resources stay anchored to the produced file, while fixed-width pages and long text
-are constrained to the available column width.
+Markdown、SVG、HTML、PDF 和图片都可以在侧边栏内预览。相对资源会以产物文件
+自身为基准解析，固定宽度页面和长文本也会约束在当前侧栏宽度内。
 
-![SVG preview in DSH Right Sidebar](docs/images/show2.png)
+![DSH Right Sidebar 中的 SVG 预览](docs/images/show2.png)
 
-## Install
+## 安装
 
-DSH Right Sidebar currently targets a DSH Web build that exposes the session-scoped
-`details.overlay` slot and named details-surface APIs.
+DSH Right Sidebar 当前要求 DSH Web 提供会话级 `details.overlay` 插槽和具名详情栏 API。
 
 ```sh
 git clone https://github.com/Limitinfinitude/DSH-Right-Sidebar.git
@@ -47,32 +44,32 @@ npm run build
 dsh plugin --profile web add .
 ```
 
-Refresh the DSH Web session after installation.
+安装后刷新 DSH Web 会话。
 
-## Use
+## 使用
 
-1. Ask DSH to create a document, diagram, image, page, or source file.
-2. Previewable results open automatically; source files are added quietly.
-3. Switch, close, or drag tabs to arrange the current session's outputs.
-4. Use the footer controls to copy, reveal, download, pin, or hide an entry.
+1. 让 DSH 创建文档、图表、图片、页面或源码文件。
+2. 可预览结果会自动打开，源码文件则安静地加入标签。
+3. 切换、关闭或拖拽标签，整理当前会话的产物。
+4. 从底部最左侧的本会话产物目录重新打开关闭过的条目。
+5. 使用底部控件复制、定位目录、下载、置顶或隐藏条目。
 
-## Supported Formats
+## 支持格式
 
-| Category | Formats |
+| 类别 | 格式 |
 |---|---|
-| Documents | Markdown, MDX, PDF |
-| Visuals | SVG, PNG, JPEG, WebP, GIF, AVIF, BMP |
-| Web | HTML, HTM |
-| Text and code | Common source, configuration, data, and plain-text extensions |
+| 文档 | Markdown、MDX、PDF |
+| 视觉内容 | SVG、PNG、JPEG、WebP、GIF、AVIF、BMP |
+| Web | HTML、HTM |
+| 文本与代码 | 常见源码、配置、数据和纯文本扩展名 |
 
-## How It Works
+## 工作原理
 
-The Node half exposes a workspace-confined, read-only file route. The client half
-derives output paths from mutation tool records, folds them into a per-session view,
-and registers the viewer in DSH's native details column. Preview content is sanitized
-before rendering; quality checks are deterministic and use no model calls.
+Node 侧提供限定在工作区内的只读文件路由；客户端从修改工具记录中派生产物路径，
+聚合成会话级视图，并把查看器注册到 DSH 原生详情栏。所有预览内容都会在渲染前
+经过净化，质量检查完全由确定性规则完成，不调用模型。
 
-## Development
+## 开发
 
 ```sh
 npm test -- --run
@@ -80,13 +77,13 @@ npm run typecheck
 npm run build
 ```
 
-## Current Limitations
+## 当前限制
 
-- File reads are limited to the boot workspace and registered DSH workspaces.
-- HTML previews use a script-free sandbox.
-- Viewing preferences are stored in the browser; output history is rebuilt from the session log.
-- Deployed development servers are not embedded yet; this release previews their produced files.
+- 文件读取范围限定在启动工作区和 DSH 已注册工作区内。
+- HTML 使用禁用脚本的沙箱预览。
+- 查看偏好保存在当前浏览器；会话输出历史从日志重新构建。
+- 当前版本尚未嵌入已部署的开发服务器，只预览项目生成的文件。
 
-## License
+## 许可证
 
 [MIT](LICENSE)

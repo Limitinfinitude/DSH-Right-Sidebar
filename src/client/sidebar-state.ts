@@ -27,6 +27,16 @@ export function visibleTabs(
       || right.lastSeq - left.lastSeq)
 }
 
+/** Session history stays available after closing tabs; explicitly hidden files do not. */
+export function catalogEntries(
+  entries: readonly OutputEntry[],
+  hidden: ReadonlySet<string>,
+): readonly OutputEntry[] {
+  return entries
+    .filter(entry => !hidden.has(entry.path))
+    .sort((left, right) => right.lastSeq - left.lastSeq)
+}
+
 /** Apply manual order to known tabs while leaving newly produced entries in front. */
 export function orderedTabs(
   entries: readonly OutputEntry[],

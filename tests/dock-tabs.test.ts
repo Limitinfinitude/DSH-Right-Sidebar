@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { OutputEntry } from '../src/client/contract.ts'
-import { directoryOfPath, orderedTabs, reorderTab, visibleTabs } from '../src/client/sidebar-state.ts'
+import { catalogEntries, directoryOfPath, orderedTabs, reorderTab, visibleTabs } from '../src/client/sidebar-state.ts'
 
 function entry(path: string, lastSeq: number): OutputEntry {
   return { path, kind: 'text', firstTurn: 1, lastTurn: 1, lastSeq }
@@ -27,6 +27,14 @@ describe('output dock tabs', () => {
     expect(visibleTabs([entry('report.txt', 2)], new Set(), new Set(), closed)).toEqual([])
     expect(visibleTabs([entry('report.txt', 3)], new Set(), new Set(), closed)
       .map(item => item.path)).toEqual(['report.txt'])
+  })
+
+  it('keeps closed outputs in the session catalog while excluding hidden outputs', () => {
+    expect(catalogEntries([
+      entry('first.txt', 1),
+      entry('third.txt', 3),
+      entry('second.txt', 2),
+    ], new Set(['second.txt'])).map(item => item.path)).toEqual(['third.txt', 'first.txt'])
   })
 
   it('moves a later tab in front when it is dragged onto the first tab', () => {

@@ -1,6 +1,6 @@
 /** Native details-column output viewer and its inactive edge launcher. */
 import {
-  Check, Clipboard, Download, EyeOff, Files, FolderOpen, Link,
+  Check, Clipboard, Download, EyeOff, Files, FolderOpen, Link, List,
   PanelRightClose, Pin, PinOff, RotateCcw, X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
@@ -19,7 +19,8 @@ import type { QcResult } from './qc.ts'
 import { mergeQcResult } from './qc-state.ts'
 import { fileUrl } from './resources.ts'
 import {
-  directoryOfPath, orderedTabs, reconcileSelection, reorderTab, shouldAutoOpen, visibleTabs,
+  catalogEntries, directoryOfPath, orderedTabs, reconcileSelection, reorderTab, shouldAutoOpen,
+  visibleTabs,
 } from './sidebar-state.ts'
 import {
   dockRenderTarget, getCompactViewport, subscribeCompactViewport,
@@ -127,6 +128,7 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
   const [qcByPath, setQcByPath] = useState<ReadonlyMap<string, QcResult>>(new Map())
   const [copied, setCopied] = useState<'path' | 'content' | null>(null)
+  const [catalogOpen, setCatalogOpen] = useState(false)
   const selectedRef = useRef<string | null>(null)
   const seenSeqRef = useRef(0)
 
@@ -146,6 +148,10 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
   const visible = useMemo(
     () => orderedTabs(automaticOrder, sessionState.order),
     [automaticOrder, sessionState.order],
+  )
+  const catalog = useMemo(
+    () => catalogEntries(snapshot.entries, hidden),
+    [hidden, snapshot.entries],
   )
 
   useEffect(() => {
@@ -231,6 +237,14 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
       closedAt: { ...previous.closedAt, [entry.path]: entry.lastSeq },
     }))
   }
+  const reopen = (entry: OutputEntry): void => {
+    updateSessionState(previous => {
+      const { [entry.path]: _closedAt, ...closedAt } = previous.closedAt
+      return { ...previous, closedAt }
+    })
+    select(entry.path)
+    setCatalogOpen(false)
+  }
   const dropTab = (targetPath: string, sourcePath: string | null): void => {
     if (sourcePath === null || sourcePath === '') return
     const order = reorderTab(visible.map(entry => entry.path), sourcePath, targetPath)
@@ -306,8 +320,7 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
           </div>
         )
         : (
-          <>
-            <div className="dsh-od-preview-canvas">
+          <div className="dsh-od-preview-canvas">
               <Preview
                 key={selected.path}
                 entry={selected}
@@ -318,10 +331,37 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
                   empty: t('preview.empty'),
                 }}
               />
-            </div>
+          </div>
+        )}
 
-            <footer className="dsh-od-footer">
-              <div className="dsh-od-toolbar">
+      <footer className="dsh-od-footer">
+        {catalogOpen && (
+          <div className="dsh-od-catalog" role="listbox" aria-label={t('dock.openCatalog')}>
+            {catalog.map(entry => (
+              <button
+                type="button"
+                className="dsh-od-catalog-item"
+                role="option"
+                aria-selected={entry.path === selectedPath}
+                key={entry.path}
+                onClick={() => { reopen(entry) }}
+                title={entry.path}
+              >
+                <span className={`dsh-od-kind dsh-od-kind-${entry.kind}`}>{entry.kind}</span>
+                <span className="dsh-od-catalog-copy">
+                  <span>{basename(entry.path)}</span>
+                  <small>{entry.path}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="dsh-od-toolbar">
+          <IconButton label={t('dock.openCatalog')} active={catalogOpen} onClick={() => { setCatalogOpen(current => !current) }}>
+            <List size={16} aria-hidden />
+          </IconButton>
+          {selected !== null && (
+            <div className="dsh-od-toolbar-actions">
                 <IconButton label={copied === 'path' ? t('dock.copied') : t('dock.copyPath')} onClick={() => { void copy(selected.path, 'path') }}>
                   {copied === 'path' ? <Check size={16} aria-hidden /> : <Link size={16} aria-hidden />}
                 </IconButton>
@@ -348,10 +388,10 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
                 <IconButton label={t('dock.hide')} onClick={() => { hide(selected.path) }}>
                   <EyeOff size={16} aria-hidden />
                 </IconButton>
-              </div>
-            </footer>
-          </>
-        )}
+            </div>
+          )}
+        </div>
+      </footer>
     </section>
   )
 }

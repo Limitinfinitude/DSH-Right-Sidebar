@@ -9,6 +9,7 @@ export declare const zh: {
     'dock.expand': string;
     'dock.collapse': string;
     'dock.chooseFile': string;
+    'dock.openCatalog': string;
     'dock.closeTab': string;
     'dock.preview': string;
     'dock.copyPath': string;

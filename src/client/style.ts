@@ -22,9 +22,9 @@ export const DOCK_CSS = `
   grid-template-columns: minmax(0, 1fr) 30px;
   align-items: center;
   gap: 8px;
-  min-height: 48px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  min-height: 61px;
+  padding: 6px 10px;
+  border-bottom: 1.5px solid var(--dsw-alias-border-l2);
 }
 
 .dsh-od-tabs {
@@ -426,6 +426,7 @@ export const DOCK_CSS = `
 .dsh-od-preview-pdf { height: 100%; }
 
 .dsh-od-footer {
+  position: relative;
   flex: none;
   border-top: 1px solid var(--dsw-alias-border-l2);
   background: var(--dsw-alias-bg-base);
@@ -435,9 +436,79 @@ export const DOCK_CSS = `
   display: flex;
   min-height: 44px;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 4px;
   padding: 6px 10px;
+}
+
+.dsh-od-toolbar-actions {
+  display: flex;
+  min-width: 0;
+  margin-left: auto;
+  gap: 4px;
+}
+
+.dsh-od-catalog {
+  position: absolute;
+  right: 10px;
+  bottom: calc(100% + 8px);
+  left: 10px;
+  z-index: 8;
+  max-height: min(332px, 50vh);
+  padding: 5px;
+  overflow-y: auto;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-base);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+}
+
+.dsh-od-catalog-item {
+  display: grid;
+  width: 100%;
+  min-height: 46px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dsh-od-catalog-item:hover,
+.dsh-od-catalog-item[aria-selected='true'] {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.dsh-od-catalog-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dsh-od-catalog-copy > span,
+.dsh-od-catalog-copy > small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dsh-od-catalog-copy > span {
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+}
+
+.dsh-od-catalog-copy > small {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 16px;
 }
 
 .dsh-od-launcher {
@@ -491,6 +562,9 @@ export const DOCK_CSS = `
 }
 
 @media (max-width: 1023px) {
+  .dsh-od-header {
+    min-height: 48px;
+  }
   .dsh-od-mobile-shell {
     position: absolute;
     inset: 0 0 0 56px;
