@@ -57,5 +57,6 @@ describe('sidebar automatic opening', () => {
 
   it('keeps source and configuration-like text outputs in the tab list without opening', () => {
     expect(shouldAutoOpen(entry('src/app.tsx', 2))).toBe(false)
+    expect(shouldAutoOpen({ ...entry('src/app.tsx', 2), kind: 'code' })).toBe(false)
   })
 })

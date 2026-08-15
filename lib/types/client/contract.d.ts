@@ -4,7 +4,11 @@
  */
 import type { ConversationLocation, ConversationViewNode } from '@deepseek-ai/dsh-client-runtime/client';
 /** Preview category an output file renders as. */
-export type OutputKind = 'md' | 'svg' | 'image' | 'html' | 'pdf' | 'text';
+export type OutputKind = 'md' | 'svg' | 'image' | 'html' | 'pdf' | 'text' | 'code';
+/** Binary previews stay read-only; text-backed documents may be edited in place. */
+export declare function isEditableKind(kind: OutputKind): boolean;
+/** Source files belong in the agent transcript and workspace, not the outputs dock. */
+export declare function isDockVisibleKind(kind: OutputKind): boolean;
 /** One collected output file, first-seen deduped across turns. */
 export interface OutputEntry {
     /** Host-side path as reported by the mutation tool's locations. */

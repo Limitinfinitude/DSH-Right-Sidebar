@@ -6,10 +6,11 @@
  */
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { OutputEntry } from './contract.ts'
+import { renderedHtmlToMarkdown } from './markdown-edit.ts'
 import { checkHtml, checkMarkdown, checkSvg, QC_LOADING, type QcResult } from './qc.ts'
-import { fileUrl, prepareHtml, prepareHtmlFragment, prepareSvg } from './resources.ts'
+import { fileUrl, prepareHtml, prepareHtmlFragment, prepareSvg, saveFileContent } from './resources.ts'
 
 /** Sanitize Markdown-rendered HTML. */
 function sanitizeHtml(html: string): string {
@@ -32,11 +33,12 @@ type TextPreviewState =
   | { readonly status: 'error'; readonly content: '' }
 
 function isTextBacked(entry: OutputEntry): boolean {
-  return entry.kind === 'md' || entry.kind === 'svg' || entry.kind === 'html' || entry.kind === 'text'
+  return entry.kind === 'md' || entry.kind === 'svg' || entry.kind === 'html'
+    || entry.kind === 'text' || entry.kind === 'code'
 }
 
 /** Text-backed previews fetch once per selected path. */
-function useTextPreview(entry: OutputEntry): TextPreviewState {
+function useTextPreview(entry: OutputEntry, revision: number): TextPreviewState {
   const [state, setState] = useState<TextPreviewState>({ status: 'idle', content: '' })
   useEffect(() => {
     if (!isTextBacked(entry)) {
@@ -53,7 +55,7 @@ function useTextPreview(entry: OutputEntry): TextPreviewState {
       .then(text => { if (!stale) setState({ status: 'ready', content: text }) })
       .catch(() => { if (!stale) setState({ status: 'error', content: '' }) })
     return () => { stale = true }
-  }, [entry.kind, entry.path])
+  }, [entry.kind, entry.path, revision])
   return state
 }
 
@@ -62,7 +64,28 @@ export function MarkdownPreview({ entry, content }: { entry: OutputEntry; conten
     entry.path,
     sanitizeHtml(marked.parse(content, { async: false }) as string),
   ), [content, entry.path])
-  return <div className="dsh-od-preview-md" dangerouslySetInnerHTML={{ __html: html }} />
+  const latest = useRef(content)
+  const timer = useRef<number | null>(null)
+  useEffect(() => {
+    latest.current = content
+  }, [content])
+  useEffect(() => () => {
+    if (timer.current !== null) window.clearTimeout(timer.current)
+  }, [])
+  const onInput = (event: React.FormEvent<HTMLDivElement>): void => {
+    const markdown = renderedHtmlToMarkdown(DOMPurify.sanitize(event.currentTarget.innerHTML, {
+      USE_PROFILES: { html: true },
+    }))
+    if (markdown === latest.current) return
+    if (timer.current !== null) window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => {
+      void saveFileContent(entry.path, markdown).then(() => { latest.current = markdown }).catch(() => {})
+    }, 700)
+  }
+  return (
+    <div className="dsh-od-preview-md" contentEditable suppressContentEditableWarning
+      onInput={onInput} dangerouslySetInnerHTML={{ __html: html }} />
+  )
 }
 
 export function SvgPreview({ entry, content }: { entry: OutputEntry; content: string }): React.JSX.Element {
@@ -96,6 +119,29 @@ export function TextPreview({ content }: { content: string }): React.JSX.Element
   return <pre className="dsh-od-preview-text"><code>{content}</code></pre>
 }
 
+function codeLanguage(path: string): string {
+  const extension = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
+  const labels: Record<string, string> = {
+    js: 'JavaScript', jsx: 'JSX', ts: 'TypeScript', tsx: 'TSX', css: 'CSS', scss: 'SCSS',
+    less: 'Less', py: 'Python', sh: 'Shell', ps1: 'PowerShell', sql: 'SQL', go: 'Go',
+    rs: 'Rust', java: 'Java', c: 'C', h: 'C Header', cpp: 'C++', hpp: 'C++ Header',
+    vue: 'Vue', svelte: 'Svelte',
+  }
+  return labels[extension] ?? extension.toUpperCase()
+}
+
+export function CodePreview({ entry, content }: { entry: OutputEntry; content: string }): React.JSX.Element {
+  const lines = content.split('\n')
+  return (
+    <section className="dsh-od-code-preview" aria-label={codeLanguage(entry.path)}>
+      <div className="dsh-od-code-language">{codeLanguage(entry.path)}</div>
+      <ol className="dsh-od-code-lines">
+        {lines.map((line, index) => <li key={`${index}:${line}`}><code>{line || ' '}</code></li>)}
+      </ol>
+    </section>
+  )
+}
+
 export function PdfPreview({ entry, onResult }: {
   entry: OutputEntry
   onResult: (result: QcResult) => void
@@ -122,7 +168,8 @@ export function Preview({ entry, onResult, labels }: {
   onResult: (result: QcResult) => void
   labels: PreviewLabels
 }): React.JSX.Element {
-  const state = useTextPreview(entry)
+  const [revision, setRevision] = useState(0)
+  const state = useTextPreview(entry, revision)
 
   useEffect(() => {
     if (!isTextBacked(entry)) return
@@ -171,5 +218,7 @@ export function Preview({ entry, onResult, labels }: {
       return <PdfPreview entry={entry} onResult={onResult} />
     case 'text':
       return <TextPreview content={state.status === 'ready' ? state.content : ''} />
+    case 'code':
+      return <CodePreview entry={entry} content={state.status === 'ready' ? state.content : ''} />
   }
 }

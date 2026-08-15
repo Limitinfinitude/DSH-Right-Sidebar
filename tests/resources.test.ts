@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { kindOfPath } from '../src/formats.ts'
+import { isDockVisibleKind, isEditableKind } from '../src/client/contract.ts'
 import { prepareHtml, prepareSvg, resolveResourceUrl } from '../src/client/resources.ts'
 
 describe('output format classification', () => {
@@ -12,7 +13,8 @@ describe('output format classification', () => {
     ['prototype.htm', 'html'],
     ['paper.pdf', 'pdf'],
     ['data.json', 'text'],
-    ['component.tsx', 'text'],
+    ['component.tsx', 'code'],
+    ['server.js', 'code'],
     ['notes.yaml', 'text'],
   ] as const)('classifies %s as %s', (path, expected) => {
     expect(kindOfPath(path)).toBe(expected)
@@ -20,6 +22,24 @@ describe('output format classification', () => {
 
   it('leaves unsupported binary office files out of the preview list', () => {
     expect(kindOfPath('report.docx')).toBeNull()
+  })
+})
+
+describe('editable output categories', () => {
+  it.each(['md', 'svg', 'html', 'text', 'code'] as const)('allows editing %s files', kind => {
+    expect(isEditableKind(kind)).toBe(true)
+  })
+
+  it.each(['image', 'pdf'] as const)('keeps %s files read-only', kind => {
+    expect(isEditableKind(kind)).toBe(false)
+  })
+})
+
+describe('dock visibility', () => {
+  it('keeps source code out of the output dock', () => {
+    expect(isDockVisibleKind('code')).toBe(false)
+    expect(isDockVisibleKind('html')).toBe(false)
+    expect(isDockVisibleKind('md')).toBe(true)
   })
 })
 

@@ -414,6 +414,102 @@ export const DOCK_CSS = `
   overflow-wrap: anywhere;
 }
 
+.dsh-od-code-preview {
+  min-width: 0;
+  min-height: 100%;
+  background: var(--dsw-alias-markdown-code-block);
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.dsh-od-code-language,
+.dsh-od-editor-tools {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  color: var(--dsw-alias-label-tertiary);
+  font-family: var(--ds-font-family, ui-sans-serif, system-ui, sans-serif);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.dsh-od-code-lines {
+  margin: 0;
+  padding: 12px 12px 12px 48px;
+  overflow-x: auto;
+  tab-size: 2;
+}
+
+.dsh-od-code-lines li {
+  padding-left: 10px;
+  white-space: pre;
+}
+
+.dsh-od-code-lines li::marker {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.dsh-od-editor {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--dsw-alias-markdown-code-block);
+}
+
+.dsh-od-editor-tools > div {
+  display: flex;
+  gap: 3px;
+}
+
+.dsh-od-editor-tools button {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.dsh-od-editor-tools button:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.dsh-od-editor-tools button:disabled { opacity: 0.45; cursor: wait; }
+
+.dsh-od-editor textarea {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  resize: none;
+  padding: 14px 16px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
+  line-height: 20px;
+  tab-size: 2;
+  white-space: pre;
+  overflow: auto;
+}
+
+.dsh-od-editor p {
+  margin: 0;
+  padding: 7px 12px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+}
+
+.dsh-od-editor p[data-state='error'] { color: var(--dsw-alias-state-error-primary); }
+
 .dsh-od-preview-frame {
   display: block;
   flex: 1;

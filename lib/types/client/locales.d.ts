@@ -14,6 +14,11 @@ export declare const zh: {
     'dock.preview': string;
     'dock.copyPath': string;
     'dock.copyContent': string;
+    'dock.edit': string;
+    'dock.save': string;
+    'dock.cancel': string;
+    'dock.saving': string;
+    'dock.saveError': string;
     'dock.pin': string;
     'dock.unpin': string;
     'dock.hide': string;

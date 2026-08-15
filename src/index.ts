@@ -6,7 +6,7 @@
  * Typert surface — the dock is read-only.
  */
 import { createReadStream, realpathSync } from 'node:fs'
-import { realpath, stat } from 'node:fs/promises'
+import { realpath, stat, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { extname, isAbsolute, join, relative, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
@@ -44,6 +44,23 @@ export const inject = ['webServer', 'workspaceRegistry']
 const MAX_BYTES = 16 * 1024 * 1024
 
 const ALLOWED_EXTENSIONS = new Set(Object.keys(OUTPUT_FORMATS))
+
+function editableFile(file: string): boolean {
+  const kind = OUTPUT_FORMATS[extname(file).slice(1).toLowerCase()]?.kind
+  return kind !== undefined && kind !== 'image' && kind !== 'pdf'
+}
+
+async function requestText(req: IncomingMessage): Promise<string | null> {
+  const chunks: Buffer[] = []
+  let size = 0
+  for await (const chunk of req) {
+    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    size += bytes.length
+    if (size > MAX_BYTES) return null
+    chunks.push(bytes)
+  }
+  return Buffer.concat(chunks).toString('utf8')
+}
 
 /**
  * Resolve a requested path against the workspace roots, keeping the result
@@ -110,6 +127,28 @@ export function apply(ctx: Context): void {
       if (!info.isFile() || info.size > MAX_BYTES) {
         res.writeHead(404)
         res.end('not found')
+        return
+      }
+      if (req.method === 'PUT') {
+        if (!editableFile(file)) {
+          res.writeHead(415, { 'Content-Type': 'text/plain; charset=utf-8' })
+          res.end('output-dock: this file type is read-only')
+          return
+        }
+        const content = await requestText(req)
+        if (content === null) {
+          res.writeHead(413, { 'Content-Type': 'text/plain; charset=utf-8' })
+          res.end('output-dock: file content exceeds the size limit')
+          return
+        }
+        await writeFile(file, content, 'utf8')
+        res.writeHead(204, { 'Cache-Control': 'no-cache' })
+        res.end()
+        return
+      }
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        res.writeHead(405, { Allow: 'GET, HEAD, PUT' })
+        res.end()
         return
       }
       const type = OUTPUT_FORMATS[extname(file).slice(1).toLowerCase()]?.mime ?? 'application/octet-stream'

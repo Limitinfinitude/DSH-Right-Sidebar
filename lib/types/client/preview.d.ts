@@ -19,6 +19,10 @@ export declare function HtmlPreview({ entry, content }: {
 export declare function TextPreview({ content }: {
     content: string;
 }): React.JSX.Element;
+export declare function CodePreview({ entry, content }: {
+    entry: OutputEntry;
+    content: string;
+}): React.JSX.Element;
 export declare function PdfPreview({ entry, onResult }: {
     entry: OutputEntry;
     onResult: (result: QcResult) => void;

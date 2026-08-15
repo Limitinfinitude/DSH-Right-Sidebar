@@ -5,6 +5,16 @@ export function fileUrl(path: string): string {
   return `${ROUTE_PATH}?path=${encodeURIComponent(path)}`
 }
 
+/** Save text-backed output content through the workspace-confined file route. */
+export async function saveFileContent(path: string, content: string): Promise<void> {
+  const response = await fetch(fileUrl(path), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    body: content,
+  })
+  if (!response.ok) throw new Error(String(response.status))
+}
+
 function isSiblingReference(href: string): boolean {
   return href !== ''
     && !href.startsWith('#')
