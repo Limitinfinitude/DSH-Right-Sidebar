@@ -1,13 +1,8 @@
-/**
- * Per-session incremental view builder: folds each turn's published payload
- * into a first-seen-deduped flat entry list. Replace clears; apply merges
- * only the changed turns.
- */
 import type { ConversationViewBuilder, ConversationViewDefinition } from '@deepseek-ai/dsh-client-runtime/client';
-import type { OutputDockSnapshot, OutputDockViewNode } from './contract.ts';
+import { type OutputDockSnapshot, type OutputDockViewNode, type PublishedOutput } from './contract.ts';
 export declare class OutputDockViewBuilder implements ConversationViewBuilder<OutputDockViewNode, OutputDockSnapshot> {
     readonly empty: OutputDockSnapshot;
-    private turns;
+    private readonly nodes;
     replace(input: {
         readonly nodes: readonly OutputDockViewNode[];
     }): OutputDockSnapshot;
@@ -16,5 +11,5 @@ export declare class OutputDockViewBuilder implements ConversationViewBuilder<Ou
     }): OutputDockSnapshot;
     private snapshot;
 }
-/** The dock's conversation view target definition. */
+export declare function publicationsForTurn(snapshot: OutputDockSnapshot, turn: number, closingSeq: number): readonly PublishedOutput[];
 export declare const outputDockViewDefinition: ConversationViewDefinition<OutputDockViewNode, OutputDockSnapshot>;
