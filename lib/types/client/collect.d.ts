@@ -6,16 +6,16 @@
  * dock's extension allowlist.
  */
 import type { ConversationNodeDefinition, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client';
+import type { OutputDockTurnPayload } from './contract.ts';
+import { type ProducedOutputCandidate } from './output-policy.ts';
 export { kindOfPath } from '../formats.ts';
 /** Trailing path segment, the part that identifies the file at a glance. */
 export declare function basename(path: string): string;
 interface OutputDockState {
     readonly turn: number;
     readonly calls: ReadonlyMap<string, ToolResultNode['callView']>;
-    readonly produced: readonly {
-        readonly seq: number;
-        readonly path: string;
-    }[];
+    readonly produced: OutputDockTurnPayload['produced'];
+    readonly pending: ReadonlyMap<string, ProducedOutputCandidate>;
 }
 /** Turn-local successful mutation accumulator with the dock's extension filter. */
 export declare const outputDockDefinition: ConversationNodeDefinition<OutputDockState>;

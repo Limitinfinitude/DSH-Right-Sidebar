@@ -7,7 +7,7 @@ DSH Right Sidebar is a native output workspace for
 diagrams, images, data, and documents generated in a session beside the conversation instead
 of scattering them across the workspace and tool history.
 
-![Output Dock overview](docs/images/show1.png)
+![Output Dock overview](docs/images/test1.png)
 
 ## Purpose
 
@@ -28,14 +28,15 @@ dependencies, and HTML source files remain the responsibility of the DSH workspa
 | --- | --- |
 | Documents | Markdown, MDX, PDF |
 | Graphics and images | SVG, PNG, JPEG, WebP, GIF, AVIF, BMP |
-| Text and data | TXT, LOG, JSON, JSONL, CSV, TSV, YAML, TOML, XML, INI, CONF |
-| Workspace files | Source, configuration, and HTML/HTM stay out of the output dock |
+| Automatic outputs | Markdown, MDX, PDF, SVG, and common image formats |
+| Explicit data outputs | TXT, JSON, JSONL, CSV, and TSV; shown only when named in the agent's final response |
+| Workspace files | Source, configuration, logs, HTML/HTM, YAML, TOML, XML, INI, and CONF stay out of the dock |
 
 HTML files are project source. A deployed website should instead be provided by the agent as an
 accessible URL in the conversation. This keeps a frontend or full-stack project with many `js`,
 `ts`, `css`, and configuration files from drowning out its actual deliverables.
 
-![Output Dock preview](docs/images/show2.png)
+![Output Dock preview](docs/images/test2.png)
 
 ## Use
 
@@ -63,7 +64,7 @@ Refresh the DSH Web session after installation.
 
 The dock does not poll files or ports while idle. Output content is fetched only after selection,
 and complex previews initialize on demand. Markdown editing no longer loads a generic HTML
-conversion package; the browser bundle is approximately `163 KB gzip`.
+conversion package; the browser bundle is approximately `164 KB gzip`.
 
 Local file access is constrained to validated workspace paths. Markdown and SVG are sanitized
 before rendering, binary files are read-only, and HTML/HTM source is never embedded in the dock.
@@ -75,8 +76,6 @@ npm test -- --run
 npm run typecheck
 npm run build
 ```
-
-See the [preview PRD](docs/prd-output-preview.md) for coverage and the roadmap.
 
 ## License
 

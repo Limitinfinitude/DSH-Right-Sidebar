@@ -9,8 +9,10 @@ import type {
   ConversationNodeContext, ConversationNodeDefinition, ConversationMatch, ToolResultNode,
 } from '@deepseek-ai/dsh-client-runtime/client'
 import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-client-runtime/client'
-import { isDockVisibleKind, type OutputDockTurnPayload, type OutputDockViewNode } from './contract.ts'
-import { kindOfPath } from '../formats.ts'
+import type { OutputDockTurnPayload, OutputDockViewNode } from './contract.ts'
+import {
+  mentionedConditionalOutputs, outputDisposition, type ProducedOutputCandidate,
+} from './output-policy.ts'
 
 export { kindOfPath } from '../formats.ts'
 
@@ -37,7 +39,15 @@ function producedPaths(view: ToolResultNode['callView']): readonly string[] {
 interface OutputDockState {
   readonly turn: number
   readonly calls: ReadonlyMap<string, ToolResultNode['callView']>
-  readonly produced: readonly { readonly seq: number; readonly path: string }[]
+  readonly produced: OutputDockTurnPayload['produced']
+  readonly pending: ReadonlyMap<string, ProducedOutputCandidate>
+}
+
+function assistantText(event: Extract<ConversationMatch['event'], { type: 'assistant/message' }>): string {
+  return event.data.message.content
+    .filter(block => block.type === 'text')
+    .map(block => block.text)
+    .join('\n')
 }
 
 function nodeFor(context: ConversationNodeContext<OutputDockState>): OutputDockViewNode | null {
@@ -67,13 +77,16 @@ export const outputDockDefinition: ConversationNodeDefinition<OutputDockState> =
     if (event.type === 'tool/result' && isAppendSurfaceEvent(event)) {
       return { id: String(event.data.turn), role: 'update' }
     }
+    if (event.type === 'assistant/message' && isAppendSurfaceEvent(event)) {
+      return { id: String(event.data.turn), role: 'update' }
+    }
     return null
   },
   start: (_context, match) => {
     if (match.event.type !== 'turn/start') {
       throw new Error('output-dock start requires turn/start')
     }
-    return { turn: match.event.data.turn, calls: new Map(), produced: [] }
+    return { turn: match.event.data.turn, calls: new Map(), produced: [], pending: new Map() }
   },
   update: (context, match) => {
     if (match.event.type === 'tool/call') {
@@ -84,19 +97,35 @@ export const outputDockDefinition: ConversationNodeDefinition<OutputDockState> =
       )
       return { ...context.state, calls }
     }
+    if (match.event.type === 'assistant/message') {
+      const released = mentionedConditionalOutputs(
+        [...context.state.pending.values()],
+        assistantText(match.event),
+      )
+      if (released.length === 0) return context.state
+      const pending = new Map(context.state.pending)
+      for (const entry of released) pending.delete(entry.path)
+      return { ...context.state, pending, produced: [...context.state.produced, ...released] }
+    }
     if (match.event.type !== 'tool/result') return context.state
     const result = match.event.data.message.content[0]
     if (result.isError === true) return context.state
     const callId = String(match.event.data.message.source.callId)
-    const additions = producedPaths(context.state.calls.get(callId) ?? null)
-      .map(path => ({ seq: match.event.seq, path }))
-      .filter(entry => {
-        const kind = kindOfPath(entry.path)
-        return kind !== null && isDockVisibleKind(kind)
-      })
-    return additions.length === 0
-      ? context.state
-      : { ...context.state, produced: [...context.state.produced, ...additions] }
+    const pending = new Map(context.state.pending)
+    const additions: OutputDockTurnPayload['produced'][number][] = []
+    let pendingChanged = false
+    for (const path of producedPaths(context.state.calls.get(callId) ?? null)) {
+      const disposition = outputDisposition(path)
+      if (disposition === 'automatic') {
+        additions.push({ seq: match.event.seq, path, publication: 'automatic' })
+      } else if (disposition === 'explicit') {
+        const previous = pending.get(path)
+        pending.set(path, { seq: match.event.seq, path })
+        pendingChanged ||= previous?.seq !== match.event.seq
+      }
+    }
+    if (additions.length === 0 && !pendingChanged) return context.state
+    return { ...context.state, pending, produced: [...context.state.produced, ...additions] }
   },
   publication: (_match: ConversationMatch) => 'immediate',
   buildViewNode: nodeFor,

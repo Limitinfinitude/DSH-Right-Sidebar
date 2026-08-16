@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { kindOfPath } from '../src/formats.ts'
 import { isDockVisibleKind, isEditableKind } from '../src/client/contract.ts'
-import { prepareHtml, prepareSvg, resolveResourceUrl } from '../src/client/resources.ts'
+import { fileUrl, prepareHtml, prepareSvg, resolveResourceUrl } from '../src/client/resources.ts'
 
 describe('output format classification', () => {
   it.each([
@@ -36,7 +36,7 @@ describe('editable output categories', () => {
 })
 
 describe('dock visibility', () => {
-  it('keeps source code out of the output dock', () => {
+  it('keeps source and HTML kinds out of the output dock renderer', () => {
     expect(isDockVisibleKind('code')).toBe(false)
     expect(isDockVisibleKind('html')).toBe(false)
     expect(isDockVisibleKind('md')).toBe(true)
@@ -44,6 +44,11 @@ describe('dock visibility', () => {
 })
 
 describe('preview resource URLs', () => {
+  it('versions selected output URLs so repeated edits refetch the same path', () => {
+    expect(fileUrl('D:\\work\\report.md', 42))
+      .toBe('/api/output-dock/file?path=D%3A%5Cwork%5Creport.md&rev=42')
+  })
+
   it('routes Windows sibling resources through the workspace file endpoint', () => {
     expect(resolveResourceUrl('D:\\work\\docs\\report.md', '../images/chart.png'))
       .toBe('/api/output-dock/file?path=D%3A%2Fwork%2Fimages%2Fchart.png')

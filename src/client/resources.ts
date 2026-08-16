@@ -1,8 +1,15 @@
 import { ROUTE_PATH } from '../route.ts'
 
 /** Browser URL for one workspace-confined output file. */
-export function fileUrl(path: string): string {
-  return `${ROUTE_PATH}?path=${encodeURIComponent(path)}`
+export function fileUrl(path: string, revision?: number): string {
+  const version = revision === undefined ? '' : `&rev=${encodeURIComponent(String(revision))}`
+  return `${ROUTE_PATH}?path=${encodeURIComponent(path)}${version}`
+}
+
+/** Authorize one agent-produced path before loading it from the local route. */
+export async function authorizeFileContent(path: string): Promise<void> {
+  const response = await fetch(fileUrl(path), { method: 'POST' })
+  if (!response.ok) throw new Error(String(response.status))
 }
 
 /** Save text-backed output content through the workspace-confined file route. */

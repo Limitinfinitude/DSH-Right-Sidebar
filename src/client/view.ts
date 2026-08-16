@@ -11,6 +11,7 @@ import type {
 } from './contract.ts'
 import { EMPTY_OUTPUT_DOCK_SNAPSHOT, isDockVisibleKind } from './contract.ts'
 import { kindOfPath } from './collect.ts'
+import { shouldPublishOutput } from './output-policy.ts'
 
 export class OutputDockViewBuilder implements ConversationViewBuilder<OutputDockViewNode, OutputDockSnapshot> {
   readonly empty = EMPTY_OUTPUT_DOCK_SNAPSHOT
@@ -34,6 +35,7 @@ export class OutputDockViewBuilder implements ConversationViewBuilder<OutputDock
       const payload = this.turns.get(turn)
       if (payload === undefined) continue
       for (const produced of payload.produced) {
+        if (!shouldPublishOutput(produced.path, produced.publication)) continue
         const kind = kindOfPath(produced.path)
         if (kind === null || !isDockVisibleKind(kind)) continue
         const previous = entries.get(produced.path)

@@ -8,7 +8,7 @@
 import { createReadStream, realpathSync } from 'node:fs'
 import { realpath, stat, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { extname, isAbsolute, join, relative, resolve } from 'node:path'
+import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { ROUTE_PATH } from './route.ts'
 import { OUTPUT_FORMATS } from './formats.ts'
@@ -42,8 +42,50 @@ export const name = 'output-dock'
 export const inject = ['webServer', 'workspaceRegistry']
 
 const MAX_BYTES = 16 * 1024 * 1024
+const AUTHORIZED_ROOT_LIMIT = 256
+const AUTHORIZED_ROOT_TTL = 6 * 60 * 60 * 1000
 
 const ALLOWED_EXTENSIONS = new Set(Object.keys(OUTPUT_FORMATS))
+const authorizedRoots = new Map<string, number>()
+
+function activeAuthorizedRoots(now = Date.now()): readonly string[] {
+  for (const [root, authorizedAt] of authorizedRoots) {
+    if (now - authorizedAt > AUTHORIZED_ROOT_TTL) authorizedRoots.delete(root)
+  }
+  return [...authorizedRoots.keys()]
+}
+
+function authorizeRoot(root: string): void {
+  authorizedRoots.delete(root)
+  authorizedRoots.set(root, Date.now())
+  while (authorizedRoots.size > AUTHORIZED_ROOT_LIMIT) {
+    const oldest = authorizedRoots.keys().next().value as string | undefined
+    if (oldest === undefined) break
+    authorizedRoots.delete(oldest)
+  }
+}
+
+function isSameOrigin(req: IncomingMessage): boolean {
+  const origin = req.headers.origin
+  const host = req.headers.host
+  if (origin === undefined) return true
+  if (typeof origin !== 'string' || typeof host !== 'string') return false
+  try {
+    return new URL(origin).host === host
+  } catch {
+    return false
+  }
+}
+
+async function supportedFile(raw: string): Promise<string | null> {
+  if (raw === '' || !isAbsolute(raw)) return null
+  try {
+    const real = await realpath(raw)
+    return ALLOWED_EXTENSIONS.has(extname(real).slice(1).toLowerCase()) ? real : null
+  } catch {
+    return null
+  }
+}
 
 function editableFile(file: string): boolean {
   const kind = OUTPUT_FORMATS[extname(file).slice(1).toLowerCase()]?.kind
@@ -110,7 +152,32 @@ export function apply(ctx: Context): void {
     async handler(req, res) {
       const roots = [...new Set([bootRoot(), ...ctx.workspaceRegistry.list().map(workspace => workspace.path)])]
       const url = new URL(req.url ?? '/', 'http://localhost')
-      const file = await workspaceFile(url.searchParams.get('path') ?? '', roots)
+      const rawPath = url.searchParams.get('path') ?? ''
+      if (req.method === 'POST') {
+        if (!isSameOrigin(req)) {
+          res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
+          res.end('output-dock: cross-origin authorization rejected')
+          return
+        }
+        const workspaceProduced = await workspaceFile(rawPath, roots)
+        const produced = workspaceProduced ?? await supportedFile(rawPath)
+        if (produced === null) {
+          res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' })
+          res.end('output-dock: unsupported produced path')
+          return
+        }
+        const info = await stat(produced)
+        if (!info.isFile() || info.size > MAX_BYTES) {
+          res.writeHead(404)
+          res.end('not found')
+          return
+        }
+        authorizeRoot(dirname(produced))
+        res.writeHead(204, { 'Cache-Control': 'no-store' })
+        res.end()
+        return
+      }
+      const file = await workspaceFile(rawPath, [...roots, ...activeAuthorizedRoots()])
       if (file === null) {
         res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' })
         res.end('output-dock: rejected path (outside any workspace or unsupported extension)')
@@ -147,7 +214,7 @@ export function apply(ctx: Context): void {
         return
       }
       if (req.method !== 'GET' && req.method !== 'HEAD') {
-        res.writeHead(405, { Allow: 'GET, HEAD, PUT' })
+        res.writeHead(405, { Allow: 'GET, HEAD, POST, PUT' })
         res.end()
         return
       }

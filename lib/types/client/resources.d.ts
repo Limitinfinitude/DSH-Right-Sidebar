@@ -1,5 +1,7 @@
 /** Browser URL for one workspace-confined output file. */
-export declare function fileUrl(path: string): string;
+export declare function fileUrl(path: string, revision?: number): string;
+/** Authorize one agent-produced path before loading it from the local route. */
+export declare function authorizeFileContent(path: string): Promise<void>;
 /** Save text-backed output content through the workspace-confined file route. */
 export declare function saveFileContent(path: string, content: string): Promise<void>;
 /** Resolve one resource reference found inside a preview document. */

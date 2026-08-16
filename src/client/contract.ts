@@ -3,6 +3,7 @@
  * declaration-merged business keys the runtime engine types against.
  */
 import type { ConversationLocation, ConversationViewNode } from '@deepseek-ai/dsh-client-runtime/client'
+import type { OutputPublication } from './output-policy.ts'
 
 /** Preview category an output file renders as. */
 export type OutputKind = 'md' | 'svg' | 'image' | 'html' | 'pdf' | 'text' | 'code'
@@ -37,7 +38,11 @@ export const EMPTY_OUTPUT_DOCK_SNAPSHOT: OutputDockSnapshot = { entries: [] }
 /** Per-turn payload the definition publishes to the view builder. */
 export interface OutputDockTurnPayload {
   readonly turn: number
-  readonly produced: readonly { readonly seq: number; readonly path: string }[]
+  readonly produced: readonly {
+    readonly seq: number
+    readonly path: string
+    readonly publication?: OutputPublication
+  }[]
 }
 
 /** View node envelope the definition materializes. */

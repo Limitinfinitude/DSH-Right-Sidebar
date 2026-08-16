@@ -10,7 +10,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { OutputEntry } from './contract.ts'
 import { renderedHtmlToMarkdown } from './markdown-edit.ts'
 import { checkHtml, checkMarkdown, checkSvg, QC_LOADING, type QcResult } from './qc.ts'
-import { fileUrl, prepareHtml, prepareHtmlFragment, prepareSvg, saveFileContent } from './resources.ts'
+import {
+  authorizeFileContent, fileUrl, prepareHtml, prepareHtmlFragment, prepareSvg, saveFileContent,
+} from './resources.ts'
 
 /** Sanitize Markdown-rendered HTML. */
 function sanitizeHtml(html: string): string {
@@ -37,17 +39,32 @@ function isTextBacked(entry: OutputEntry): boolean {
     || entry.kind === 'text' || entry.kind === 'code'
 }
 
-/** Text-backed previews fetch once per selected path. */
-function useTextPreview(entry: OutputEntry, revision: number): TextPreviewState {
+type FileAccessState = 'loading' | 'ready' | 'error'
+
+function useFileAccess(entry: OutputEntry): FileAccessState {
+  const [state, setState] = useState<FileAccessState>('loading')
+  useEffect(() => {
+    let stale = false
+    setState('loading')
+    void authorizeFileContent(entry.path)
+      .then(() => { if (!stale) setState('ready') })
+      .catch(() => { if (!stale) setState('error') })
+    return () => { stale = true }
+  }, [entry.path])
+  return state
+}
+
+/** Text-backed previews refetch whenever the producing event sequence changes. */
+function useTextPreview(entry: OutputEntry, access: FileAccessState): TextPreviewState {
   const [state, setState] = useState<TextPreviewState>({ status: 'idle', content: '' })
   useEffect(() => {
-    if (!isTextBacked(entry)) {
+    if (!isTextBacked(entry) || access !== 'ready') {
       setState({ status: 'idle', content: '' })
       return
     }
     let stale = false
     setState({ status: 'loading', content: '' })
-    void fetch(fileUrl(entry.path))
+    void fetch(fileUrl(entry.path, entry.lastSeq))
       .then(async response => {
         if (!response.ok) throw new Error(String(response.status))
         return response.text()
@@ -55,7 +72,7 @@ function useTextPreview(entry: OutputEntry, revision: number): TextPreviewState 
       .then(text => { if (!stale) setState({ status: 'ready', content: text }) })
       .catch(() => { if (!stale) setState({ status: 'error', content: '' }) })
     return () => { stale = true }
-  }, [entry.kind, entry.path, revision])
+  }, [access, entry.kind, entry.lastSeq, entry.path])
   return state
 }
 
@@ -97,7 +114,7 @@ export function ImagePreview({ entry, onResult }: {
   entry: OutputEntry
   onResult: (result: QcResult) => void
 }): React.JSX.Element {
-  const src = fileUrl(entry.path)
+  const src = fileUrl(entry.path, entry.lastSeq)
   return (
     <img
       className="dsh-od-preview-img"
@@ -149,7 +166,7 @@ export function PdfPreview({ entry, onResult }: {
   return (
     <iframe
       className="dsh-od-preview-frame dsh-od-preview-pdf"
-      src={fileUrl(entry.path)}
+      src={fileUrl(entry.path, entry.lastSeq)}
       title={entry.path}
       onLoad={() => { onResult({ level: 'ok', issues: [] }) }}
       onError={() => { onResult({ level: 'error', issues: [{ level: 'error', code: 'file-read' }] }) }}
@@ -168,8 +185,8 @@ export function Preview({ entry, onResult, labels }: {
   onResult: (result: QcResult) => void
   labels: PreviewLabels
 }): React.JSX.Element {
-  const [revision, setRevision] = useState(0)
-  const state = useTextPreview(entry, revision)
+  const access = useFileAccess(entry)
+  const state = useTextPreview(entry, access)
 
   useEffect(() => {
     if (!isTextBacked(entry)) return
@@ -196,10 +213,10 @@ export function Preview({ entry, onResult, labels }: {
     return () => { stale = true }
   }, [entry, onResult, state])
 
-  if (state.status === 'error') {
+  if (access === 'error' || state.status === 'error') {
     return <div className="dsh-od-preview-state" data-state="error">{labels.error}</div>
   }
-  if (isTextBacked(entry) && state.status !== 'ready') {
+  if (access !== 'ready' || (isTextBacked(entry) && state.status !== 'ready')) {
     return <div className="dsh-od-preview-state" data-state="loading">{labels.loading}</div>
   }
   if (state.status === 'ready' && state.content === '') {
