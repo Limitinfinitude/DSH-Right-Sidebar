@@ -17,6 +17,7 @@ dependencies, and HTML source files remain the responsibility of the DSH workspa
 
 - Permanent right-edge entry that can open automatically, collapse, and restore manually
 - Session-aware outputs, tab order, and closed-tab state
+- Automatic refresh when the agent updates an output at the same path
 - Closeable, draggable stacked tabs that retain readable names in a narrow sidebar
 - A footer catalog that reopens closed outputs and scrolls independently after seven entries
 - Direct, rendered Markdown editing with silent save after typing stops
@@ -26,11 +27,9 @@ dependencies, and HTML source files remain the responsibility of the DSH workspa
 
 | Category | Supported now |
 | --- | --- |
-| Documents | Markdown, MDX, PDF |
-| Graphics and images | SVG, PNG, JPEG, WebP, GIF, AVIF, BMP |
-| Automatic outputs | Markdown, MDX, PDF, SVG, and common image formats |
-| Explicit data outputs | TXT, JSON, JSONL, CSV, and TSV; shown only when named in the agent's final response |
-| Workspace files | Source, configuration, logs, HTML/HTM, YAML, TOML, XML, INI, and CONF stay out of the dock |
+| Automatic outputs | Markdown, MDX, PDF, SVG, PNG, JPEG, WebP, GIF, AVIF, and BMP |
+| On-demand outputs | TXT, JSON, JSONL, CSV, and TSV; shown only when the agent explicitly mentions the file path or name |
+| Not displayed | Source, HTML/HTM, configuration, logs, YAML, TOML, XML, INI, CONF, and other project-internal files |
 
 HTML files are project source. A deployed website should instead be provided by the agent as an
 accessible URL in the conversation. This keeps a frontend or full-stack project with many `js`,
@@ -41,9 +40,10 @@ accessible URL in the conversation. This keeps a frontend or full-stack project 
 ## Use
 
 1. Ask DSH to generate a report, diagram, image, PDF, or data file.
-2. When a previewable result appears, the right sidebar opens with the newest output selected.
-3. Switch between outputs through tabs; reopen a closed item from the footer catalog.
-4. Use "Reveal directory" when you need the source or project files in the DSH workspace.
+2. Rich outputs such as Markdown, PDF, SVG, and images automatically open the sidebar with the newest output selected.
+3. Data files such as TXT, JSON, and CSV enter the output list only when the agent explicitly mentions them, and they do not replace the active rich preview.
+4. Switch between outputs through tabs; reopen a closed item from the footer catalog.
+5. Use "Reveal directory" when you need the source or project files in the DSH workspace.
 
 ## Install
 
@@ -66,8 +66,10 @@ The dock does not poll files or ports while idle. Output content is fetched only
 and complex previews initialize on demand. Markdown editing no longer loads a generic HTML
 conversion package; the browser bundle is approximately `164 KB gzip`.
 
-Local file access is constrained to validated workspace paths. Markdown and SVG are sanitized
-before rendering, binary files are read-only, and HTML/HTM source is never embedded in the dock.
+Files inside a workspace are path-validated. Agent-produced outputs outside registered workspaces
+can be accessed temporarily after same-origin authorization from DSH. Up to 256 authorized external
+roots are retained, and each expires after six hours. Markdown and SVG are sanitized before rendering,
+binary files are read-only, and HTML/HTM source is never embedded in the dock.
 
 ## Development
 
