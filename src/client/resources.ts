@@ -1,4 +1,5 @@
 import { ROUTE_PATH } from '../route.ts'
+import { isNetworkOutput } from '../formats.ts'
 
 /** Browser URL for one workspace-confined output file. */
 export function fileUrl(path: string, revision?: number): string {
@@ -7,13 +8,16 @@ export function fileUrl(path: string, revision?: number): string {
 }
 
 /** Authorize one agent-produced path before loading it from the local route. */
-export async function authorizeFileContent(path: string): Promise<void> {
+export async function authorizeFileContent(path: string): Promise<string> {
   const response = await fetch(fileUrl(path), { method: 'POST' })
   if (!response.ok) throw new Error(String(response.status))
+  const resolved = response.headers.get('X-Output-Dock-Resolved')
+  return resolved === null ? path : decodeURIComponent(resolved)
 }
 
 /** Save text-backed output content through the workspace-confined file route. */
 export async function saveFileContent(path: string, content: string): Promise<void> {
+  if (isNetworkOutput(path)) throw new Error('network outputs are read-only')
   const response = await fetch(fileUrl(path), {
     method: 'PUT',
     headers: { 'Content-Type': 'text/plain; charset=utf-8' },
@@ -49,6 +53,7 @@ function normalizeSibling(sourcePath: string, reference: string): string {
 /** Resolve one resource reference found inside a preview document. */
 export function resolveResourceUrl(sourcePath: string, href: string): string {
   if (!isSiblingReference(href)) return href
+  if (isNetworkOutput(sourcePath)) return new URL(href, sourcePath).href
   const hashAt = href.indexOf('#')
   const beforeHash = hashAt === -1 ? href : href.slice(0, hashAt)
   const hash = hashAt === -1 ? '' : href.slice(hashAt)

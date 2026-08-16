@@ -1,8 +1,12 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { kindOfPath } from '../src/formats.ts'
 import { isDockVisibleKind, isEditableKind } from '../src/client/contract.ts'
-import { fileUrl, prepareHtml, prepareSvg, resolveResourceUrl } from '../src/client/resources.ts'
+import {
+  authorizeFileContent, fileUrl, prepareHtml, prepareSvg, resolveResourceUrl,
+} from '../src/client/resources.ts'
+
+afterEach(() => { vi.unstubAllGlobals() })
 
 describe('output format classification', () => {
   it.each([
@@ -16,6 +20,7 @@ describe('output format classification', () => {
     ['component.tsx', 'code'],
     ['server.js', 'code'],
     ['notes.yaml', 'text'],
+    ['https://files.example.com/report.pdf?download=1', 'pdf'],
   ] as const)('classifies %s as %s', (path, expected) => {
     expect(kindOfPath(path)).toBe(expected)
   })
@@ -47,6 +52,20 @@ describe('preview resource URLs', () => {
   it('versions selected output URLs so repeated edits refetch the same path', () => {
     expect(fileUrl('D:\\work\\report.md', 42))
       .toBe('/api/output-dock/file?path=D%3A%5Cwork%5Creport.md&rev=42')
+  })
+
+  it('returns the canonical path supplied by the authorization route', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, {
+      status: 204,
+      headers: { 'X-Output-Dock-Resolved': encodeURIComponent('D:\\work\\nested\\report.md') },
+    })))
+
+    await expect(authorizeFileContent('report.md')).resolves.toBe('D:\\work\\nested\\report.md')
+  })
+
+  it('resolves relative resources against a network document URL', () => {
+    expect(resolveResourceUrl('https://files.example.com/docs/report.md', '../images/chart.png'))
+      .toBe('https://files.example.com/images/chart.png')
   })
 
   it('routes Windows sibling resources through the workspace file endpoint', () => {

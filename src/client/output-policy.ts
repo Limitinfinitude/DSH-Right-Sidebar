@@ -1,4 +1,5 @@
 import { marked } from 'marked'
+import { isNetworkOutput, outputExtension, outputPathname } from '../formats.ts'
 
 export type OutputDisposition = 'automatic' | 'explicit' | 'never'
 export type OutputPublication = 'automatic' | 'explicit'
@@ -26,7 +27,7 @@ const INTERNAL_NAMES = new Set([
 ])
 
 function normalized(path: string): string {
-  return path.replaceAll('\\', '/').toLowerCase()
+  return outputPathname(path).replaceAll('\\', '/').toLowerCase()
 }
 
 function basename(path: string): string {
@@ -35,9 +36,7 @@ function basename(path: string): string {
 }
 
 function extension(path: string): string {
-  const name = basename(path)
-  const dot = name.lastIndexOf('.')
-  return dot === -1 ? '' : name.slice(dot + 1)
+  return outputExtension(path)
 }
 
 /** Classify a changed file by product value, not merely browser readability. */
@@ -82,7 +81,8 @@ function cleanMentionedPath(raw: string): string | null {
   if (path === '') return null
   try { path = decodeURIComponent(path) } catch {}
   if (path.startsWith('//')) return null
-  if (/^[A-Za-z][A-Za-z\d+.-]*:/.test(path) && !/^[A-Za-z]:[\\/]/.test(path)) return null
+  if (/^[A-Za-z][A-Za-z\d+.-]*:/.test(path) && !/^[A-Za-z]:[\\/]/.test(path)
+    && !isNetworkOutput(path)) return null
   return outputDisposition(path) === 'never' ? null : path
 }
 
@@ -97,9 +97,17 @@ export function mentionedOutputPaths(assistantText: string): readonly string[] {
     `(?<![\\p{L}\\p{N}_])(?:[A-Za-z]:[\\\\/][^\\r\\n\`\"'<>|?*]+?\\.(?:${MENTIONED_EXTENSION_PATTERN})|(?:\\.{0,2}[\\\\/])?[A-Za-z0-9_@+.,()\\-]+(?:[\\\\/][A-Za-z0-9_@+.,()\\-]+)*\\.(?:${MENTIONED_EXTENSION_PATTERN}))(?=$|[\\s，。；：！？,;:!?)])`,
     'giu',
   )
+  for (const line of assistantText.split(/\r?\n/)) {
+    for (const match of line.matchAll(/https?:\/\/[^\s<>"'`]+/giu)) {
+      const before = line.slice(0, match.index)
+      if (/(?:输出|产物|文件|报告|图片|图表|下载|预览|查看|结果|链接|地址|url)[^。！？!?]{0,48}$/iu.test(before)) {
+        add(match[0])
+      }
+    }
+  }
   const tokens = marked.lexer(assistantText)
   marked.walkTokens(tokens, token => {
-    if (token.type === 'link') add(token.href)
+    if (token.type === 'link' && token.raw.startsWith('[')) add(token.href)
     if (token.type === 'codespan') add(token.text)
     if (token.type === 'text') {
       const searchable = token.text.replace(/[A-Za-z][A-Za-z\d+.-]*:\/\/\S+/g, '')
@@ -110,6 +118,9 @@ export function mentionedOutputPaths(assistantText: string): readonly string[] {
   for (const path of paths) {
     const value = normalized(path)
     const related = output.findIndex(candidate => {
+      if (isNetworkOutput(path) || isNetworkOutput(candidate)) {
+        return path.toLowerCase() === candidate.toLowerCase()
+      }
       const existing = normalized(candidate)
       return value === existing || value.endsWith(`/${existing}`) || existing.endsWith(`/${value}`)
     })

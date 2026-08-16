@@ -48,4 +48,17 @@ describe('output path identity', () => {
       'D:\\other\\report.md',
     ])
   })
+
+  it('keeps a network output distinct from a local file with the same basename', () => {
+    const builder = new OutputDockViewBuilder()
+    const snapshot = builder.replace({ nodes: [
+      node(1, 2, 'report.pdf'),
+      node(2, 5, 'https://files.example.com/report.pdf'),
+    ] })
+
+    expect(snapshot.entries.map(entry => entry.path)).toEqual([
+      'report.pdf',
+      'https://files.example.com/report.pdf',
+    ])
+  })
 })

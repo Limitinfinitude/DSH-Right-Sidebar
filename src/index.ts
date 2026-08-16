@@ -6,12 +6,14 @@
  * Typert surface — the dock is read-only.
  */
 import { createReadStream, realpathSync } from 'node:fs'
-import { realpath, stat, writeFile } from 'node:fs/promises'
+import { readdir, realpath, stat, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path'
 import type { Context } from '@deepseek-ai/cordis'
 import { ROUTE_PATH } from './route.ts'
-import { OUTPUT_FORMATS } from './formats.ts'
+import {
+  isNetworkOutput, OUTPUT_FORMATS, outputExtension,
+} from './formats.ts'
 
 /** Minimal typed faces of the harness services this half consumes. */
 interface OutputDockWebServer {
@@ -44,9 +46,14 @@ export const inject = ['webServer', 'workspaceRegistry']
 const MAX_BYTES = 16 * 1024 * 1024
 const AUTHORIZED_ROOT_LIMIT = 256
 const AUTHORIZED_ROOT_TTL = 6 * 60 * 60 * 1000
+const REMOTE_TIMEOUT_MS = 10_000
+const SEARCH_ENTRY_LIMIT = 20_000
+const SEARCH_DEPTH_LIMIT = 12
 
 const ALLOWED_EXTENSIONS = new Set(Object.keys(OUTPUT_FORMATS))
 const authorizedRoots = new Map<string, number>()
+const authorizedUrls = new Map<string, number>()
+const SKIPPED_SEARCH_DIRECTORIES = new Set(['.git', '.dsh', 'node_modules', '.venv', 'venv'])
 
 function activeAuthorizedRoots(now = Date.now()): readonly string[] {
   for (const [root, authorizedAt] of authorizedRoots) {
@@ -62,6 +69,23 @@ function authorizeRoot(root: string): void {
     const oldest = authorizedRoots.keys().next().value as string | undefined
     if (oldest === undefined) break
     authorizedRoots.delete(oldest)
+  }
+}
+
+function activeAuthorizedUrl(url: string, now = Date.now()): boolean {
+  for (const [candidate, authorizedAt] of authorizedUrls) {
+    if (now - authorizedAt > AUTHORIZED_ROOT_TTL) authorizedUrls.delete(candidate)
+  }
+  return authorizedUrls.has(url)
+}
+
+function authorizeUrl(url: string): void {
+  authorizedUrls.delete(url)
+  authorizedUrls.set(url, Date.now())
+  while (authorizedUrls.size > AUTHORIZED_ROOT_LIMIT) {
+    const oldest = authorizedUrls.keys().next().value as string | undefined
+    if (oldest === undefined) break
+    authorizedUrls.delete(oldest)
   }
 }
 
@@ -84,6 +108,128 @@ async function supportedFile(raw: string): Promise<string | null> {
     return ALLOWED_EXTENSIONS.has(extname(real).slice(1).toLowerCase()) ? real : null
   } catch {
     return null
+  }
+}
+
+type SearchResult =
+  | { readonly kind: 'found'; readonly path: string }
+  | { readonly kind: 'ambiguous' | 'missing' }
+
+async function searchWorkspaceFile(raw: string, roots: readonly string[]): Promise<SearchResult> {
+  if (raw === '' || isAbsolute(raw) || isNetworkOutput(raw)) return { kind: 'missing' }
+  const parts = raw.replaceAll('\\', '/').replace(/^(?:\.{3}|…)\/+/, '').split('/')
+    .filter(part => part !== '' && part !== '.')
+  if (parts.length === 0 || parts.includes('..')) return { kind: 'missing' }
+  const suffix = parts.join('/').toLowerCase()
+  if (!ALLOWED_EXTENSIONS.has(outputExtension(suffix))) return { kind: 'missing' }
+
+  const matches = new Set<string>()
+  let visited = 0
+  for (const root of roots) {
+    const pending: { readonly directory: string; readonly depth: number }[] = [
+      { directory: root, depth: 0 },
+    ]
+    while (pending.length > 0 && visited < SEARCH_ENTRY_LIMIT) {
+      const current = pending.shift()
+      if (current === undefined) break
+      let entries
+      try { entries = await readdir(current.directory, { withFileTypes: true }) } catch { continue }
+      for (const entry of entries) {
+        visited += 1
+        if (visited > SEARCH_ENTRY_LIMIT) break
+        const candidate = join(current.directory, entry.name)
+        if (entry.isDirectory()) {
+          if (current.depth < SEARCH_DEPTH_LIMIT && !SKIPPED_SEARCH_DIRECTORIES.has(entry.name)) {
+            pending.push({ directory: candidate, depth: current.depth + 1 })
+          }
+          continue
+        }
+        if (!entry.isFile() || !ALLOWED_EXTENSIONS.has(outputExtension(entry.name))) continue
+        const rel = relative(root, candidate).replaceAll('\\', '/').toLowerCase()
+        if (rel !== suffix && !rel.endsWith(`/${suffix}`)) continue
+        try { matches.add(await realpath(candidate)) } catch { continue }
+        if (matches.size > 1) return { kind: 'ambiguous' }
+      }
+    }
+  }
+  const match = matches.values().next().value as string | undefined
+  return match === undefined ? { kind: 'missing' } : { kind: 'found', path: match }
+}
+
+async function remoteBytes(response: Response): Promise<Buffer | null> {
+  const declared = Number(response.headers.get('content-length'))
+  if (Number.isFinite(declared) && declared > MAX_BYTES) return null
+  if (response.body === null) return Buffer.alloc(0)
+  const reader = response.body.getReader()
+  const chunks: Buffer[] = []
+  let size = 0
+  while (true) {
+    const result = await reader.read()
+    if (result.done) break
+    const chunk = Buffer.from(result.value)
+    size += chunk.length
+    if (size > MAX_BYTES) {
+      await reader.cancel()
+      return null
+    }
+    chunks.push(chunk)
+  }
+  return Buffer.concat(chunks)
+}
+
+async function proxyNetworkOutput(
+  raw: string,
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<void> {
+  if (!activeAuthorizedUrl(raw)) {
+    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
+    res.end('output-dock: network output is not authorized')
+    return
+  }
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.writeHead(405, { Allow: 'GET, HEAD, POST' })
+    res.end()
+    return
+  }
+  const format = OUTPUT_FORMATS[outputExtension(raw)]
+  if (format === undefined) {
+    res.writeHead(400)
+    res.end('output-dock: unsupported network output')
+    return
+  }
+  try {
+    const upstream = await fetch(raw, {
+      method: req.method,
+      redirect: 'follow',
+      headers: { Accept: format.mime },
+      signal: AbortSignal.timeout(REMOTE_TIMEOUT_MS),
+    })
+    if (!upstream.ok) {
+      res.writeHead(upstream.status)
+      res.end('output-dock: upstream request failed')
+      return
+    }
+    if (req.method === 'HEAD') {
+      res.writeHead(200, { 'Content-Type': format.mime, 'Cache-Control': 'no-store' })
+      res.end()
+      return
+    }
+    const content = await remoteBytes(upstream)
+    if (content === null) {
+      res.writeHead(413)
+      res.end('output-dock: network output exceeds the size limit')
+      return
+    }
+    res.writeHead(200, {
+      'Content-Type': format.mime,
+      'Content-Length': String(content.length),
+      'Cache-Control': 'no-store',
+    })
+    res.end(content)
+  } catch {
+    res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' })
+    res.end('output-dock: network output request failed')
   }
 }
 
@@ -150,7 +296,8 @@ export function apply(ctx: Context): void {
     kind: 'route',
     path: ROUTE_PATH,
     async handler(req, res) {
-      const roots = [...new Set([bootRoot(), ...ctx.workspaceRegistry.list().map(workspace => workspace.path)])]
+      const workspaceRoots = [...new Set(ctx.workspaceRegistry.list().map(workspace => workspace.path))]
+      const roots = [...new Set([bootRoot(), ...workspaceRoots])]
       const url = new URL(req.url ?? '/', 'http://localhost')
       const rawPath = url.searchParams.get('path') ?? ''
       if (req.method === 'POST') {
@@ -159,8 +306,31 @@ export function apply(ctx: Context): void {
           res.end('output-dock: cross-origin authorization rejected')
           return
         }
+        if (isNetworkOutput(rawPath)) {
+          if (!ALLOWED_EXTENSIONS.has(outputExtension(rawPath))) {
+            res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' })
+            res.end('output-dock: unsupported network output')
+            return
+          }
+          authorizeUrl(rawPath)
+          res.writeHead(204, {
+            'Cache-Control': 'no-store',
+            'X-Output-Dock-Resolved': encodeURIComponent(rawPath),
+          })
+          res.end()
+          return
+        }
         const workspaceProduced = await workspaceFile(rawPath, roots)
-        const produced = workspaceProduced ?? await supportedFile(rawPath)
+        let produced = workspaceProduced ?? await supportedFile(rawPath)
+        if (produced === null) {
+          const searched = await searchWorkspaceFile(rawPath, workspaceRoots)
+          if (searched.kind === 'ambiguous') {
+            res.writeHead(409, { 'Content-Type': 'text/plain; charset=utf-8' })
+            res.end('output-dock: produced path matches multiple workspace files')
+            return
+          }
+          if (searched.kind === 'found') produced = searched.path
+        }
         if (produced === null) {
           res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' })
           res.end('output-dock: unsupported produced path')
@@ -173,8 +343,15 @@ export function apply(ctx: Context): void {
           return
         }
         authorizeRoot(dirname(produced))
-        res.writeHead(204, { 'Cache-Control': 'no-store' })
+        res.writeHead(204, {
+          'Cache-Control': 'no-store',
+          'X-Output-Dock-Resolved': encodeURIComponent(produced),
+        })
         res.end()
+        return
+      }
+      if (isNetworkOutput(rawPath)) {
+        await proxyNetworkOutput(rawPath, req, res)
         return
       }
       const file = await workspaceFile(rawPath, [...roots, ...activeAuthorizedRoots()])

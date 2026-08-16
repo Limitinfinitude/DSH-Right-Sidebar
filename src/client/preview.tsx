@@ -9,6 +9,7 @@ import { ExternalLink, RefreshCw } from 'lucide-react'
 import { marked } from 'marked'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { OutputEntry } from './contract.ts'
+import { isNetworkOutput } from '../formats.ts'
 import { DataFilePreview, type DataPreviewLabels } from './DataFilePreview.tsx'
 import { MediaPreview, type MediaPreviewLabels } from './MediaPreview.tsx'
 import { renderedHtmlToMarkdown } from './markdown-edit.ts'
@@ -42,16 +43,18 @@ function isTextBacked(entry: OutputEntry): boolean {
     || entry.kind === 'text' || entry.kind === 'code'
 }
 
-type FileAccessState = 'loading' | 'ready' | 'error'
+type FileAccessState =
+  | { readonly status: 'loading' | 'error'; readonly source: '' }
+  | { readonly status: 'ready'; readonly source: string }
 
 function useFileAccess(entry: OutputEntry): FileAccessState {
-  const [state, setState] = useState<FileAccessState>('loading')
+  const [state, setState] = useState<FileAccessState>({ status: 'loading', source: '' })
   useEffect(() => {
     let stale = false
-    setState('loading')
+    setState({ status: 'loading', source: '' })
     void authorizeFileContent(entry.path)
-      .then(() => { if (!stale) setState('ready') })
-      .catch(() => { if (!stale) setState('error') })
+      .then(source => { if (!stale) setState({ status: 'ready', source }) })
+      .catch(() => { if (!stale) setState({ status: 'error', source: '' }) })
     return () => { stale = true }
   }, [entry.path])
   return state
@@ -61,13 +64,13 @@ function useFileAccess(entry: OutputEntry): FileAccessState {
 function useTextPreview(entry: OutputEntry, access: FileAccessState): TextPreviewState {
   const [state, setState] = useState<TextPreviewState>({ status: 'idle', content: '' })
   useEffect(() => {
-    if (!isTextBacked(entry) || access !== 'ready') {
+    if (!isTextBacked(entry) || access.status !== 'ready') {
       setState({ status: 'idle', content: '' })
       return
     }
     let stale = false
     setState({ status: 'loading', content: '' })
-    void fetch(fileUrl(entry.path, entry.lastSeq))
+    void fetch(fileUrl(access.source, entry.lastSeq))
       .then(async response => {
         if (!response.ok) throw new Error(String(response.status))
         return response.text()
@@ -75,15 +78,18 @@ function useTextPreview(entry: OutputEntry, access: FileAccessState): TextPrevie
       .then(text => { if (!stale) setState({ status: 'ready', content: text }) })
       .catch(() => { if (!stale) setState({ status: 'error', content: '' }) })
     return () => { stale = true }
-  }, [access, entry.kind, entry.lastSeq, entry.path])
+  }, [access, entry.kind, entry.lastSeq])
   return state
 }
 
-export function MarkdownPreview({ entry, content }: { entry: OutputEntry; content: string }): React.JSX.Element {
+export function MarkdownPreview({ source, content }: {
+  source: string
+  content: string
+}): React.JSX.Element {
   const html = useMemo(() => prepareHtmlFragment(
-    entry.path,
+    source,
     sanitizeHtml(marked.parse(content, { async: false }) as string),
-  ), [content, entry.path])
+  ), [content, source])
   const latest = useRef(content)
   const timer = useRef<number | null>(null)
   useEffect(() => {
@@ -99,31 +105,34 @@ export function MarkdownPreview({ entry, content }: { entry: OutputEntry; conten
     if (markdown === latest.current) return
     if (timer.current !== null) window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => {
-      void saveFileContent(entry.path, markdown).then(() => { latest.current = markdown }).catch(() => {})
+      void saveFileContent(source, markdown).then(() => { latest.current = markdown }).catch(() => {})
     }, 700)
   }
-  return (
-    <div className="dsh-od-preview-md" contentEditable suppressContentEditableWarning
-      onInput={onInput} dangerouslySetInnerHTML={{ __html: html }} />
-  )
+  if (isNetworkOutput(source)) {
+    return <div className="dsh-od-preview-md" dangerouslySetInnerHTML={{ __html: html }} />
+  }
+  return <div className="dsh-od-preview-md" contentEditable suppressContentEditableWarning
+    onInput={onInput} dangerouslySetInnerHTML={{ __html: html }} />
 }
 
-export function SvgPreview({ entry, content, labels }: {
+export function SvgPreview({ entry, source, content, labels }: {
   entry: OutputEntry
+  source: string
   content: string
   labels: MediaPreviewLabels
 }): React.JSX.Element {
-  const safe = useMemo(() => prepareSvg(entry.path, sanitizeSvg(content)), [content, entry.path])
+  const safe = useMemo(() => prepareSvg(source, sanitizeSvg(content)), [content, source])
   return <MediaPreview kind="svg" source={safe} alt={entry.path} labels={labels}
     onLoad={() => {}} onError={() => {}} />
 }
 
-export function ImagePreview({ entry, onResult, labels }: {
+export function ImagePreview({ entry, source, onResult, labels }: {
   entry: OutputEntry
+  source: string
   onResult: (result: QcResult) => void
   labels: MediaPreviewLabels
 }): React.JSX.Element {
-  const src = fileUrl(entry.path, entry.lastSeq)
+  const src = fileUrl(source, entry.lastSeq)
   return (
     <MediaPreview kind="image" source={src} alt={entry.path} labels={labels}
       onLoad={() => { onResult({ level: 'ok', issues: [] }) }}
@@ -132,9 +141,13 @@ export function ImagePreview({ entry, onResult, labels }: {
   )
 }
 
-export function HtmlPreview({ entry, content }: { entry: OutputEntry; content: string }): React.JSX.Element {
+export function HtmlPreview({ entry, source, content }: {
+  entry: OutputEntry
+  source: string
+  content: string
+}): React.JSX.Element {
   // sandbox="" blocks scripts, same-origin reads, and top-navigation escapes.
-  const document = useMemo(() => prepareHtml(entry.path, content), [content, entry.path])
+  const document = useMemo(() => prepareHtml(source, content), [content, source])
   return <iframe className="dsh-od-preview-frame" sandbox="" srcDoc={document} title={entry.path} />
 }
 
@@ -161,13 +174,14 @@ export function CodePreview({ entry, content }: { entry: OutputEntry; content: s
   )
 }
 
-export function PdfPreview({ entry, onResult, labels }: {
+export function PdfPreview({ entry, source, onResult, labels }: {
   entry: OutputEntry
+  source: string
   onResult: (result: QcResult) => void
   labels: { readonly refresh: string; readonly openExternal: string }
 }): React.JSX.Element {
   const [revision, setRevision] = useState(0)
-  const src = `${fileUrl(entry.path, entry.lastSeq)}&view=${revision}`
+  const src = `${fileUrl(source, entry.lastSeq)}&view=${revision}`
   return (
     <section className="dsh-od-pdf-preview">
       <div className="dsh-od-media-toolbar">
@@ -221,7 +235,7 @@ export function Preview({ entry, onResult, labels }: {
     let stale = false
     const run = async (): Promise<void> => {
       const result = entry.kind === 'md'
-        ? await checkMarkdown(entry.path, state.content)
+        ? await checkMarkdown(access.status === 'ready' ? access.source : entry.path, state.content)
         : entry.kind === 'svg'
           ? await checkSvg(state.content)
           : entry.kind === 'html'
@@ -231,12 +245,12 @@ export function Preview({ entry, onResult, labels }: {
     }
     void run()
     return () => { stale = true }
-  }, [entry, onResult, state])
+  }, [access, entry, onResult, state])
 
-  if (access === 'error' || state.status === 'error') {
+  if (access.status === 'error' || state.status === 'error') {
     return <div className="dsh-od-preview-state" data-state="error">{labels.error}</div>
   }
-  if (access !== 'ready' || (isTextBacked(entry) && state.status !== 'ready')) {
+  if (access.status !== 'ready' || (isTextBacked(entry) && state.status !== 'ready')) {
     return <div className="dsh-od-preview-state" data-state="loading">{labels.loading}</div>
   }
   if (state.status === 'ready' && state.content === '') {
@@ -244,16 +258,21 @@ export function Preview({ entry, onResult, labels }: {
   }
   switch (entry.kind) {
     case 'md':
-      return <MarkdownPreview entry={entry} content={state.status === 'ready' ? state.content : ''} />
+      return <MarkdownPreview source={access.source}
+        content={state.status === 'ready' ? state.content : ''} />
     case 'svg':
-      return <SvgPreview entry={entry} content={state.status === 'ready' ? state.content : ''}
+      return <SvgPreview entry={entry} source={access.source}
+        content={state.status === 'ready' ? state.content : ''}
         labels={labels.media} />
     case 'html':
-      return <HtmlPreview entry={entry} content={state.status === 'ready' ? state.content : ''} />
+      return <HtmlPreview entry={entry} source={access.source}
+        content={state.status === 'ready' ? state.content : ''} />
     case 'image':
-      return <ImagePreview entry={entry} onResult={onResult} labels={labels.media} />
+      return <ImagePreview entry={entry} source={access.source}
+        onResult={onResult} labels={labels.media} />
     case 'pdf':
-      return <PdfPreview entry={entry} onResult={onResult} labels={labels.pdf} />
+      return <PdfPreview entry={entry} source={access.source}
+        onResult={onResult} labels={labels.pdf} />
     case 'text':
       return <DataFilePreview path={entry.path}
         content={state.status === 'ready' ? state.content : ''} labels={labels.data} />

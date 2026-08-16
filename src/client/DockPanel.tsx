@@ -1,12 +1,13 @@
 /** Native details-column output viewer and its inactive edge launcher. */
 import {
-  Check, Clipboard, Download, EyeOff, Files, FolderOpen, Link, List,
+  Check, Clipboard, Download, ExternalLink, EyeOff, Files, FolderOpen, Link, List,
   PanelRightClose, Pin, PinOff, RotateCcw, X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ISessions, SessionFace } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { basename } from './collect.ts'
+import { isNetworkOutput } from '../formats.ts'
 import type { OutputDockSnapshot, OutputEntry } from './contract.ts'
 import { EMPTY_OUTPUT_DOCK_SNAPSHOT } from './contract.ts'
 import {
@@ -17,7 +18,7 @@ import type { NS, OutputDockKey } from './locales.ts'
 import { Preview } from './preview.tsx'
 import type { QcResult } from './qc.ts'
 import { mergeQcResult } from './qc-state.ts'
-import { fileUrl } from './resources.ts'
+import { authorizeFileContent, fileUrl } from './resources.ts'
 import {
   catalogEntries, directoryOfPath, orderedTabs, reconcileSelection, reorderTab, shouldAutoOpen,
   visibleTabs,
@@ -204,18 +205,33 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
   }
   const copyContent = async (entry: OutputEntry): Promise<void> => {
     try {
-      const response = await fetch(fileUrl(entry.path))
+      const source = await authorizeFileContent(entry.path)
+      const response = await fetch(fileUrl(source))
       if (!response.ok) return
       await copy(await response.text(), 'content')
     } catch {
       // Reading is best-effort and already has a visible preview error state.
     }
   }
-  const download = (entry: OutputEntry): void => {
-    const anchor = document.createElement('a')
-    anchor.href = fileUrl(entry.path)
-    anchor.download = basename(entry.path)
-    anchor.click()
+  const download = async (entry: OutputEntry): Promise<void> => {
+    try {
+      const source = await authorizeFileContent(entry.path)
+      const anchor = document.createElement('a')
+      anchor.href = fileUrl(source)
+      anchor.download = basename(entry.path)
+      anchor.click()
+    } catch {
+      // The selected preview already exposes authorization and read failures.
+    }
+  }
+  const reveal = (entry: OutputEntry): void => {
+    if (isNetworkOutput(entry.path)) {
+      window.open(entry.path, '_blank', 'noopener,noreferrer')
+      return
+    }
+    void authorizeFileContent(entry.path)
+      .then(source => { props.openPath(directoryOfPath(source)) })
+      .catch(() => {})
   }
   const togglePin = (path: string): void => {
     setPersisted(previous => ({
@@ -399,10 +415,13 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
                 >
                   {copied === 'content' ? <Check size={16} aria-hidden /> : <Clipboard size={16} aria-hidden />}
                 </IconButton>
-                <IconButton label={t('dock.reveal')} onClick={() => { props.openPath(directoryOfPath(selected.path)) }}>
-                  <FolderOpen size={16} aria-hidden />
+                <IconButton label={isNetworkOutput(selected.path) ? t('preview.openExternal') : t('dock.reveal')}
+                  onClick={() => { reveal(selected) }}>
+                  {isNetworkOutput(selected.path)
+                    ? <ExternalLink size={16} aria-hidden />
+                    : <FolderOpen size={16} aria-hidden />}
                 </IconButton>
-                <IconButton label={t('dock.download')} onClick={() => { download(selected) }}>
+                <IconButton label={t('dock.download')} onClick={() => { void download(selected) }}>
                   <Download size={16} aria-hidden />
                 </IconButton>
                 <IconButton

@@ -6,6 +6,7 @@ import {
 describe('output product policy', () => {
   it.each([
     'report.md', 'deck.pdf', 'diagram.svg', 'preview.png', 'photo.webp',
+    'https://files.example.com/releases/deck.pdf?token=short-lived',
   ])('automatically publishes product output %s', path => {
     expect(outputDisposition(path)).toBe('automatic')
   })
@@ -46,6 +47,17 @@ describe('output product policy', () => {
       'out/report.md',
       'D:\\exports\\hero image.png',
       'results.csv',
+    ])
+  })
+
+  it('extracts supported file URLs from Markdown links and bare assistant text', () => {
+    expect(mentionedOutputPaths([
+      '在线报告：[report](https://files.example.com/build/report.pdf?download=1)。',
+      '图片：https://cdn.example.com/output/chart.png?v=7',
+      '网页：https://example.com/dashboard',
+    ].join('\n'))).toEqual([
+      'https://files.example.com/build/report.pdf?download=1',
+      'https://cdn.example.com/output/chart.png?v=7',
     ])
   })
 

@@ -14,13 +14,15 @@ import {
   mentionedConditionalOutputs, mentionedOutputPaths, outputDisposition,
   type ProducedOutputCandidate, type PublishedOutput,
 } from './output-policy.ts'
+import { outputPathname } from '../formats.ts'
 
 export { kindOfPath } from '../formats.ts'
 
 /** Trailing path segment, the part that identifies the file at a glance. */
 export function basename(path: string): string {
-  const at = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
-  return at === -1 ? path : path.slice(at + 1)
+  const value = outputPathname(path)
+  const at = Math.max(value.lastIndexOf('/'), value.lastIndexOf('\\'))
+  return at === -1 ? value : value.slice(at + 1)
 }
 
 /**

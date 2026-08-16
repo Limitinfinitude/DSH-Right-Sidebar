@@ -10,7 +10,7 @@ import type {
   OutputDockSnapshot, OutputDockTurnPayload, OutputDockViewNode, OutputEntry,
 } from './contract.ts'
 import { EMPTY_OUTPUT_DOCK_SNAPSHOT, isDockVisibleKind } from './contract.ts'
-import { kindOfPath } from '../formats.ts'
+import { isNetworkOutput, kindOfPath } from '../formats.ts'
 import { shouldPublishOutput } from './output-policy.ts'
 
 function normalizedPath(path: string): string {
@@ -18,12 +18,16 @@ function normalizedPath(path: string): string {
 }
 
 function samePathVariant(left: string, right: string): boolean {
+  if (isNetworkOutput(left) || isNetworkOutput(right)) {
+    return left.toLowerCase() === right.toLowerCase()
+  }
   const a = normalizedPath(left)
   const b = normalizedPath(right)
   return a === b || a.endsWith(`/${b}`) || b.endsWith(`/${a}`)
 }
 
 function canonicalPath(left: string, right: string): string {
+  if (isNetworkOutput(left) || isNetworkOutput(right)) return right
   const leftAbsolute = /^[A-Za-z]:[\\/]|^\//.test(left)
   const rightAbsolute = /^[A-Za-z]:[\\/]|^\//.test(right)
   if (leftAbsolute !== rightAbsolute) return leftAbsolute ? left : right

@@ -18,6 +18,7 @@ dependencies, and HTML source files remain the responsibility of the DSH workspa
 - Permanent right-edge entry that can open automatically, collapse, and restore manually
 - Session-aware outputs, tab order, and closed-tab state
 - Automatic refresh when the agent updates an output at the same path
+- HTTP(S) file URLs explicitly delivered by the agent, plus uniquely matched incomplete workspace paths
 - Closeable, draggable stacked tabs that retain readable names in a narrow sidebar
 - A footer catalog that reopens closed outputs and scrolls independently after seven entries
 - Direct, rendered Markdown editing with silent save after typing stops
@@ -70,12 +71,19 @@ Refresh the DSH Web session after installation.
 
 The dock does not poll files or ports while idle. Output content is fetched only after selection,
 and complex previews initialize on demand. JSON search traverses the data once, tables are capped at
-10,000 rows, and TXT rendering is paginated. The browser bundle is approximately `184 KB gzip`.
+10,000 rows, and TXT rendering is paginated. The browser bundle is approximately `185 KB gzip`.
 
 Files inside a workspace are path-validated. Agent-produced outputs outside registered workspaces
 can be accessed temporarily after same-origin authorization from DSH. Up to 256 authorized external
 roots are retained, and each expires after six hours. Markdown and SVG are sanitized before rendering,
 binary files are read-only, and HTML/HTM source is never embedded in the dock.
+
+Network outputs require authorization from the same-origin DSH page and are read through a bounded
+proxy that forwards no cookies or authorization headers. Only supported file extensions are accepted;
+responses are limited to 16 MB with a 10-second timeout. A bare URL must have delivery-oriented context,
+while an explicit Markdown file link is accepted directly, so ordinary reference links stay out of the
+dock. Incomplete paths resolve only when exactly one file matches inside registered workspaces; ambiguous
+names are rejected instead of guessed.
 
 ## Development
 

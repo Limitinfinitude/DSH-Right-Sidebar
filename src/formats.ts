@@ -49,9 +49,33 @@ export const OUTPUT_FORMATS: Readonly<Record<string, { kind: OutputKind; mime: s
   svelte: { kind: 'code', mime: 'text/plain; charset=utf-8' },
 }
 
+/** Whether a produced output is an HTTP(S) resource rather than a local path. */
+export function isNetworkOutput(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return (url.protocol === 'http:' || url.protocol === 'https:')
+      && url.username === '' && url.password === ''
+  } catch {
+    return false
+  }
+}
+
+/** Path portion used for format checks and labels, excluding URL query/hash data. */
+export function outputPathname(value: string): string {
+  if (isNetworkOutput(value)) {
+    try { return decodeURIComponent(new URL(value).pathname) } catch { return new URL(value).pathname }
+  }
+  return value.split(/[?#]/, 1)[0] ?? value
+}
+
+/** Lowercase output extension without URL query or fragment suffixes. */
+export function outputExtension(value: string): string {
+  const path = outputPathname(value)
+  const dot = path.lastIndexOf('.')
+  return dot < 0 ? '' : path.slice(dot + 1).toLowerCase()
+}
+
 /** Preview category for one path, or null when the dock does not collect it. */
 export function kindOfPath(path: string): OutputKind | null {
-  const dot = path.lastIndexOf('.')
-  if (dot < 0) return null
-  return OUTPUT_FORMATS[path.slice(dot + 1).toLowerCase()]?.kind ?? null
+  return OUTPUT_FORMATS[outputExtension(path)]?.kind ?? null
 }

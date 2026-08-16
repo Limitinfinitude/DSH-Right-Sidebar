@@ -1,4 +1,5 @@
 import Papa from 'papaparse'
+import { outputExtension } from '../formats.ts'
 
 export const MAX_TABLE_ROWS = 10_000
 export const TEXT_PAGE_SIZE = 250
@@ -15,9 +16,7 @@ export type DataPreview =
   | { readonly kind: 'error'; readonly message: string }
 
 function extension(path: string): string {
-  const name = path.slice(Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1)
-  const dot = name.lastIndexOf('.')
-  return dot === -1 ? '' : name.slice(dot + 1).toLowerCase()
+  return outputExtension(path)
 }
 
 function parseJsonLines(content: string): DataPreview {
