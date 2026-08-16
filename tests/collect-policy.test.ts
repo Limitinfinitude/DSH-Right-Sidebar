@@ -46,4 +46,19 @@ describe('output collection product policy', () => {
       { path: 'out/results.json', seq: 4, publication: 'explicit' },
     ])
   })
+
+  it('publishes an assistant-named rich output without mutation locations', () => {
+    const startEvent = event('turn/start', 0, { turn: 2 })
+    let state = outputDockDefinition.start({} as never, matched(startEvent), {} as never)
+    const assistant = event('assistant/message', 8, {
+      turn: 2,
+      message: { content: [{ type: 'text', text: '预览图已生成：`D:\\outside\\preview.png`。' }] },
+    }, 'append')
+
+    state = outputDockDefinition.update({ state } as never, matched(assistant))
+
+    expect(state.produced).toEqual([
+      { path: 'D:\\outside\\preview.png', seq: 8, publication: 'automatic' },
+    ])
+  })
 })

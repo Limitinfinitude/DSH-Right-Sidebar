@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  mentionedConditionalOutputs, outputDisposition, shouldPublishOutput,
+  mentionedConditionalOutputs, mentionedOutputPaths, outputDisposition, shouldPublishOutput,
 } from '../src/client/output-policy.ts'
 
 describe('output product policy', () => {
@@ -34,5 +34,42 @@ describe('output product policy', () => {
     expect(shouldPublishOutput('out/table.csv', undefined)).toBe(false)
     expect(shouldPublishOutput('out/table.csv', 'explicit')).toBe(true)
     expect(shouldPublishOutput('config/app.toml', 'explicit')).toBe(false)
+  })
+
+  it('extracts output paths from links, inline code, and plain assistant text', () => {
+    expect(mentionedOutputPaths([
+      '报告见 [report](out/report.md)。',
+      '图片保存在 `D:\\exports\\hero image.png`。',
+      '表格是 results.csv。',
+      '参考 https://example.com/remote.pdf。',
+    ].join('\n'))).toEqual([
+      'out/report.md',
+      'D:\\exports\\hero image.png',
+      'results.csv',
+    ])
+  })
+
+  it('strips Markdown decoration and prefers the most specific spelling of one path', () => {
+    expect(mentionedOutputPaths([
+      '**只保留简历.md**',
+      '**results.csv**',
+      '输出文件为简历_pymupdf.md。',
+      '`out/report.md`',
+      '`D:\\workspace\\out\\report.md`',
+    ].join('\n'))).toEqual([
+      'results.csv',
+      'D:\\workspace\\out\\report.md',
+    ])
+  })
+
+  it('does not infer a basename fragment from a Unicode filename in a Markdown table', () => {
+    expect(mentionedOutputPaths([
+      '**输出文件：`D:\\DS_workspace\\pdf-inspector-node-demo\\简历_pymupdf.md`**',
+      '',
+      '| | pdf-inspector 版 (简历.md) | PyMuPDF 版 (简历_pymupdf.md) |',
+      '|---|---|---|',
+    ].join('\n'))).toEqual([
+      'D:\\DS_workspace\\pdf-inspector-node-demo\\简历_pymupdf.md',
+    ])
   })
 })

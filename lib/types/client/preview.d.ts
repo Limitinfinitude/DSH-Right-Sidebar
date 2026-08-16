@@ -1,36 +1,47 @@
 import type { OutputEntry } from './contract.ts';
+import { type DataPreviewLabels } from './DataFilePreview.tsx';
+import { type MediaPreviewLabels } from './MediaPreview.tsx';
 import { type QcResult } from './qc.ts';
 export declare function MarkdownPreview({ entry, content }: {
     entry: OutputEntry;
     content: string;
 }): React.JSX.Element;
-export declare function SvgPreview({ entry, content }: {
+export declare function SvgPreview({ entry, content, labels }: {
     entry: OutputEntry;
     content: string;
+    labels: MediaPreviewLabels;
 }): React.JSX.Element;
-export declare function ImagePreview({ entry, onResult }: {
+export declare function ImagePreview({ entry, onResult, labels }: {
     entry: OutputEntry;
     onResult: (result: QcResult) => void;
+    labels: MediaPreviewLabels;
 }): React.JSX.Element;
 export declare function HtmlPreview({ entry, content }: {
     entry: OutputEntry;
-    content: string;
-}): React.JSX.Element;
-export declare function TextPreview({ content }: {
     content: string;
 }): React.JSX.Element;
 export declare function CodePreview({ entry, content }: {
     entry: OutputEntry;
     content: string;
 }): React.JSX.Element;
-export declare function PdfPreview({ entry, onResult }: {
+export declare function PdfPreview({ entry, onResult, labels }: {
     entry: OutputEntry;
     onResult: (result: QcResult) => void;
+    labels: {
+        readonly refresh: string;
+        readonly openExternal: string;
+    };
 }): React.JSX.Element;
 export interface PreviewLabels {
     readonly loading: string;
     readonly error: string;
     readonly empty: string;
+    readonly data: DataPreviewLabels;
+    readonly media: MediaPreviewLabels;
+    readonly pdf: {
+        readonly refresh: string;
+        readonly openExternal: string;
+    };
 }
 export declare function Preview({ entry, onResult, labels }: {
     entry: OutputEntry;

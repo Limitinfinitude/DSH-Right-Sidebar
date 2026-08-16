@@ -10,8 +10,25 @@ import type {
   OutputDockSnapshot, OutputDockTurnPayload, OutputDockViewNode, OutputEntry,
 } from './contract.ts'
 import { EMPTY_OUTPUT_DOCK_SNAPSHOT, isDockVisibleKind } from './contract.ts'
-import { kindOfPath } from './collect.ts'
+import { kindOfPath } from '../formats.ts'
 import { shouldPublishOutput } from './output-policy.ts'
+
+function normalizedPath(path: string): string {
+  return path.replaceAll('\\', '/').toLowerCase()
+}
+
+function samePathVariant(left: string, right: string): boolean {
+  const a = normalizedPath(left)
+  const b = normalizedPath(right)
+  return a === b || a.endsWith(`/${b}`) || b.endsWith(`/${a}`)
+}
+
+function canonicalPath(left: string, right: string): string {
+  const leftAbsolute = /^[A-Za-z]:[\\/]|^\//.test(left)
+  const rightAbsolute = /^[A-Za-z]:[\\/]|^\//.test(right)
+  if (leftAbsolute !== rightAbsolute) return leftAbsolute ? left : right
+  return left.length >= right.length ? left : right
+}
 
 export class OutputDockViewBuilder implements ConversationViewBuilder<OutputDockViewNode, OutputDockSnapshot> {
   readonly empty = EMPTY_OUTPUT_DOCK_SNAPSHOT
@@ -38,16 +55,19 @@ export class OutputDockViewBuilder implements ConversationViewBuilder<OutputDock
         if (!shouldPublishOutput(produced.path, produced.publication)) continue
         const kind = kindOfPath(produced.path)
         if (kind === null || !isDockVisibleKind(kind)) continue
-        const previous = entries.get(produced.path)
-        entries.set(produced.path, previous === undefined
+        const previousKey = [...entries.keys()].find(path => samePathVariant(path, produced.path))
+        const previous = previousKey === undefined ? undefined : entries.get(previousKey)
+        const path = previousKey === undefined ? produced.path : canonicalPath(previousKey, produced.path)
+        if (previousKey !== undefined && previousKey !== path) entries.delete(previousKey)
+        entries.set(path, previous === undefined
           ? {
-            path: produced.path,
+            path,
             kind,
             firstTurn: turn,
             lastTurn: turn,
             lastSeq: produced.seq,
           }
-          : { ...previous, lastTurn: turn, lastSeq: produced.seq })
+          : { ...previous, path, lastTurn: turn, lastSeq: produced.seq })
       }
     }
     return { entries: [...entries.values()] }

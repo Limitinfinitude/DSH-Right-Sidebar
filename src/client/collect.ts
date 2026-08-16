@@ -11,7 +11,8 @@ import type {
 import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-client-runtime/client'
 import type { OutputDockTurnPayload, OutputDockViewNode } from './contract.ts'
 import {
-  mentionedConditionalOutputs, outputDisposition, type ProducedOutputCandidate,
+  mentionedConditionalOutputs, mentionedOutputPaths, outputDisposition,
+  type ProducedOutputCandidate, type PublishedOutput,
 } from './output-policy.ts'
 
 export { kindOfPath } from '../formats.ts'
@@ -98,14 +99,33 @@ export const outputDockDefinition: ConversationNodeDefinition<OutputDockState> =
       return { ...context.state, calls }
     }
     if (match.event.type === 'assistant/message') {
+      const text = assistantText(match.event)
       const released = mentionedConditionalOutputs(
         [...context.state.pending.values()],
-        assistantText(match.event),
+        text,
       )
-      if (released.length === 0) return context.state
+      const releasedNames = new Set(released.flatMap(entry => [
+        entry.path.replaceAll('\\', '/').toLowerCase(),
+        basename(entry.path).toLowerCase(),
+      ]))
+      const discovered = mentionedOutputPaths(text).flatMap<PublishedOutput>(path => {
+        const normalized = path.replaceAll('\\', '/').toLowerCase()
+        if (releasedNames.has(normalized) || releasedNames.has(basename(path).toLowerCase())) return []
+        const disposition = outputDisposition(path)
+        if (disposition === 'never') return []
+        return [{
+          path,
+          seq: match.event.seq,
+          publication: disposition === 'automatic' ? 'automatic' : 'explicit',
+        }]
+      })
+      const published = [...new Map(
+        [...released, ...discovered].map(entry => [entry.path, entry]),
+      ).values()]
+      if (published.length === 0) return context.state
       const pending = new Map(context.state.pending)
-      for (const entry of released) pending.delete(entry.path)
-      return { ...context.state, pending, produced: [...context.state.produced, ...released] }
+      for (const entry of published) pending.delete(entry.path)
+      return { ...context.state, pending, produced: [...context.state.produced, ...published] }
     }
     if (match.event.type !== 'tool/result') return context.state
     const result = match.event.data.message.content[0]

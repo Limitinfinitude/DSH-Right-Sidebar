@@ -329,6 +329,33 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
                   loading: t('preview.loading'),
                   error: t('preview.error'),
                   empty: t('preview.empty'),
+                  data: {
+                    search: t('preview.search'),
+                    raw: t('preview.raw'),
+                    structured: t('preview.structured'),
+                    wrap: t('preview.wrap'),
+                    previous: t('preview.previous'),
+                    next: t('preview.next'),
+                    page: (page, count) => t('preview.page', { page, count }),
+                    rows: count => t('preview.rows', { count }),
+                    matches: count => t('preview.matches', { count }),
+                    expandAll: t('preview.expandAll'),
+                    collapseAll: t('preview.collapseAll'),
+                    parseError: t('preview.parseError'),
+                    truncated: count => t('preview.truncated', { count }),
+                  },
+                  media: {
+                    zoomIn: t('preview.zoomIn'),
+                    zoomOut: t('preview.zoomOut'),
+                    fit: t('preview.fit'),
+                    actualSize: t('preview.actualSize'),
+                    transparency: t('preview.transparency'),
+                    dimensions: (width, height) => t('preview.dimensions', { width, height }),
+                  },
+                  pdf: {
+                    refresh: t('preview.refresh'),
+                    openExternal: t('preview.openExternal'),
+                  },
                 }}
               />
           </div>

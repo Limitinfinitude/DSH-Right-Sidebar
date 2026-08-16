@@ -31,6 +31,12 @@ dependencies, and HTML source files remain the responsibility of the DSH workspa
 | On-demand outputs | TXT, JSON, JSONL, CSV, and TSV; shown only when the agent explicitly mentions the file path or name |
 | Not displayed | Source, HTML/HTM, configuration, logs, YAML, TOML, XML, INI, CONF, and other project-internal files |
 
+- JSON/JSONL: collapsible tree, search, expand/collapse all, formatted raw view, and invalid-line reporting
+- CSV/TSV: quoted and multiline fields, filtering, numeric/text sorting, pagination, and resizable columns
+- TXT: line numbers, full-text search, match count, wrapping, and 250-line pages for bounded DOM size
+- Image/SVG: fit, actual size, zoom, drag-to-pan, dimensions, and a transparency checkerboard
+- PDF: the browser's built-in PDF reader with refresh and external-open controls
+
 HTML files are project source. A deployed website should instead be provided by the agent as an
 accessible URL in the conversation. This keeps a frontend or full-stack project with many `js`,
 `ts`, `css`, and configuration files from drowning out its actual deliverables.
@@ -63,8 +69,8 @@ Refresh the DSH Web session after installation.
 ## Performance and Security
 
 The dock does not poll files or ports while idle. Output content is fetched only after selection,
-and complex previews initialize on demand. Markdown editing no longer loads a generic HTML
-conversion package; the browser bundle is approximately `164 KB gzip`.
+and complex previews initialize on demand. JSON search traverses the data once, tables are capped at
+10,000 rows, and TXT rendering is paginated. The browser bundle is approximately `184 KB gzip`.
 
 Files inside a workspace are path-validated. Agent-produced outputs outside registered workspaces
 can be accessed temporarily after same-origin authorization from DSH. Up to 256 authorized external

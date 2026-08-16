@@ -13,3 +13,5 @@ export declare function outputDisposition(path: string): OutputDisposition;
 export declare function shouldPublishOutput(path: string, publication?: OutputPublication): boolean;
 /** Release conditional outputs explicitly named in an assistant response. */
 export declare function mentionedConditionalOutputs(candidates: readonly ProducedOutputCandidate[], assistantText: string): readonly PublishedOutput[];
+/** Paths the assistant explicitly presents as outputs, including shell-produced files. */
+export declare function mentionedOutputPaths(assistantText: string): readonly string[];

@@ -1,3 +1,5 @@
+import { marked } from 'marked'
+
 export type OutputDisposition = 'automatic' | 'explicit' | 'never'
 export type OutputPublication = 'automatic' | 'explicit'
 
@@ -14,6 +16,9 @@ const AUTOMATIC_EXTENSIONS = new Set([
   'md', 'mdx', 'pdf', 'svg', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'avif', 'bmp',
 ])
 const EXPLICIT_EXTENSIONS = new Set(['json', 'jsonl', 'csv', 'tsv', 'txt'])
+const MENTIONED_EXTENSION_PATTERN = [
+  ...AUTOMATIC_EXTENSIONS, ...EXPLICIT_EXTENSIONS,
+].sort((left, right) => right.length - left.length).join('|')
 const INTERNAL_DIRECTORIES = new Set(['.git', '.github', 'node_modules', 'src', 'config'])
 const INTERNAL_NAMES = new Set([
   'package.json', 'composer.json', 'deno.json', 'deno.jsonc', 'package-lock.json',
@@ -70,4 +75,46 @@ export function mentionedConditionalOutputs(
     if (!message.includes(path) && !message.includes(name)) return []
     return [{ ...candidate, publication: 'explicit' as const }]
   })
+}
+
+function cleanMentionedPath(raw: string): string | null {
+  let path = raw.trim().replace(/^[<'"(]+|[>'"),.;:!?，。；：！？]+$/g, '')
+  if (path === '') return null
+  try { path = decodeURIComponent(path) } catch {}
+  if (path.startsWith('//')) return null
+  if (/^[A-Za-z][A-Za-z\d+.-]*:/.test(path) && !/^[A-Za-z]:[\\/]/.test(path)) return null
+  return outputDisposition(path) === 'never' ? null : path
+}
+
+/** Paths the assistant explicitly presents as outputs, including shell-produced files. */
+export function mentionedOutputPaths(assistantText: string): readonly string[] {
+  const paths = new Set<string>()
+  const add = (raw: string): void => {
+    const path = cleanMentionedPath(raw)
+    if (path !== null) paths.add(path)
+  }
+  const plainPattern = new RegExp(
+    `(?<![\\p{L}\\p{N}_])(?:[A-Za-z]:[\\\\/][^\\r\\n\`\"'<>|?*]+?\\.(?:${MENTIONED_EXTENSION_PATTERN})|(?:\\.{0,2}[\\\\/])?[A-Za-z0-9_@+.,()\\-]+(?:[\\\\/][A-Za-z0-9_@+.,()\\-]+)*\\.(?:${MENTIONED_EXTENSION_PATTERN}))(?=$|[\\s，。；：！？,;:!?)])`,
+    'giu',
+  )
+  const tokens = marked.lexer(assistantText)
+  marked.walkTokens(tokens, token => {
+    if (token.type === 'link') add(token.href)
+    if (token.type === 'codespan') add(token.text)
+    if (token.type === 'text') {
+      const searchable = token.text.replace(/[A-Za-z][A-Za-z\d+.-]*:\/\/\S+/g, '')
+      for (const match of searchable.matchAll(plainPattern)) add(match[0])
+    }
+  })
+  const output: string[] = []
+  for (const path of paths) {
+    const value = normalized(path)
+    const related = output.findIndex(candidate => {
+      const existing = normalized(candidate)
+      return value === existing || value.endsWith(`/${existing}`) || existing.endsWith(`/${value}`)
+    })
+    if (related === -1) output.push(path)
+    else if (path.length > (output[related]?.length ?? 0)) output[related] = path
+  }
+  return output
 }

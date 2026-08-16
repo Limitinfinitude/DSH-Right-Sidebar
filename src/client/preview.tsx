@@ -5,9 +5,12 @@
  * DOMPurify on rendered output).
  */
 import DOMPurify from 'dompurify'
+import { ExternalLink, RefreshCw } from 'lucide-react'
 import { marked } from 'marked'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { OutputEntry } from './contract.ts'
+import { DataFilePreview, type DataPreviewLabels } from './DataFilePreview.tsx'
+import { MediaPreview, type MediaPreviewLabels } from './MediaPreview.tsx'
 import { renderedHtmlToMarkdown } from './markdown-edit.ts'
 import { checkHtml, checkMarkdown, checkSvg, QC_LOADING, type QcResult } from './qc.ts'
 import {
@@ -105,21 +108,24 @@ export function MarkdownPreview({ entry, content }: { entry: OutputEntry; conten
   )
 }
 
-export function SvgPreview({ entry, content }: { entry: OutputEntry; content: string }): React.JSX.Element {
+export function SvgPreview({ entry, content, labels }: {
+  entry: OutputEntry
+  content: string
+  labels: MediaPreviewLabels
+}): React.JSX.Element {
   const safe = useMemo(() => prepareSvg(entry.path, sanitizeSvg(content)), [content, entry.path])
-  return <div className="dsh-od-svg-stage" dangerouslySetInnerHTML={{ __html: safe }} />
+  return <MediaPreview kind="svg" source={safe} alt={entry.path} labels={labels}
+    onLoad={() => {}} onError={() => {}} />
 }
 
-export function ImagePreview({ entry, onResult }: {
+export function ImagePreview({ entry, onResult, labels }: {
   entry: OutputEntry
   onResult: (result: QcResult) => void
+  labels: MediaPreviewLabels
 }): React.JSX.Element {
   const src = fileUrl(entry.path, entry.lastSeq)
   return (
-    <img
-      className="dsh-od-preview-img"
-      src={src}
-      alt={entry.path}
+    <MediaPreview kind="image" source={src} alt={entry.path} labels={labels}
       onLoad={() => { onResult({ level: 'ok', issues: [] }) }}
       onError={() => { onResult({ level: 'error', issues: [{ level: 'error', code: 'image-failed' }] }) }}
     />
@@ -130,10 +136,6 @@ export function HtmlPreview({ entry, content }: { entry: OutputEntry; content: s
   // sandbox="" blocks scripts, same-origin reads, and top-navigation escapes.
   const document = useMemo(() => prepareHtml(entry.path, content), [content, entry.path])
   return <iframe className="dsh-od-preview-frame" sandbox="" srcDoc={document} title={entry.path} />
-}
-
-export function TextPreview({ content }: { content: string }): React.JSX.Element {
-  return <pre className="dsh-od-preview-text"><code>{content}</code></pre>
 }
 
 function codeLanguage(path: string): string {
@@ -159,18 +161,33 @@ export function CodePreview({ entry, content }: { entry: OutputEntry; content: s
   )
 }
 
-export function PdfPreview({ entry, onResult }: {
+export function PdfPreview({ entry, onResult, labels }: {
   entry: OutputEntry
   onResult: (result: QcResult) => void
+  labels: { readonly refresh: string; readonly openExternal: string }
 }): React.JSX.Element {
+  const [revision, setRevision] = useState(0)
+  const src = `${fileUrl(entry.path, entry.lastSeq)}&view=${revision}`
   return (
-    <iframe
-      className="dsh-od-preview-frame dsh-od-preview-pdf"
-      src={fileUrl(entry.path, entry.lastSeq)}
-      title={entry.path}
-      onLoad={() => { onResult({ level: 'ok', issues: [] }) }}
-      onError={() => { onResult({ level: 'error', issues: [{ level: 'error', code: 'file-read' }] }) }}
-    />
+    <section className="dsh-od-pdf-preview">
+      <div className="dsh-od-media-toolbar">
+        <span className="dsh-od-media-meta">PDF</span>
+        <div className="dsh-od-data-actions">
+          <button type="button" className="dsh-od-data-button" aria-label={labels.refresh}
+            title={labels.refresh} onClick={() => { setRevision(current => current + 1) }}>
+            <RefreshCw size={15} aria-hidden />
+          </button>
+          <button type="button" className="dsh-od-data-button" aria-label={labels.openExternal}
+            title={labels.openExternal}
+            onClick={() => { window.open(src, '_blank', 'noopener,noreferrer') }}>
+            <ExternalLink size={15} aria-hidden />
+          </button>
+        </div>
+      </div>
+      <iframe className="dsh-od-preview-frame dsh-od-preview-pdf" src={src} title={entry.path}
+        onLoad={() => { onResult({ level: 'ok', issues: [] }) }}
+        onError={() => { onResult({ level: 'error', issues: [{ level: 'error', code: 'file-read' }] }) }} />
+    </section>
   )
 }
 
@@ -178,6 +195,9 @@ export interface PreviewLabels {
   readonly loading: string
   readonly error: string
   readonly empty: string
+  readonly data: DataPreviewLabels
+  readonly media: MediaPreviewLabels
+  readonly pdf: { readonly refresh: string; readonly openExternal: string }
 }
 
 export function Preview({ entry, onResult, labels }: {
@@ -226,15 +246,17 @@ export function Preview({ entry, onResult, labels }: {
     case 'md':
       return <MarkdownPreview entry={entry} content={state.status === 'ready' ? state.content : ''} />
     case 'svg':
-      return <SvgPreview entry={entry} content={state.status === 'ready' ? state.content : ''} />
+      return <SvgPreview entry={entry} content={state.status === 'ready' ? state.content : ''}
+        labels={labels.media} />
     case 'html':
       return <HtmlPreview entry={entry} content={state.status === 'ready' ? state.content : ''} />
     case 'image':
-      return <ImagePreview entry={entry} onResult={onResult} />
+      return <ImagePreview entry={entry} onResult={onResult} labels={labels.media} />
     case 'pdf':
-      return <PdfPreview entry={entry} onResult={onResult} />
+      return <PdfPreview entry={entry} onResult={onResult} labels={labels.pdf} />
     case 'text':
-      return <TextPreview content={state.status === 'ready' ? state.content : ''} />
+      return <DataFilePreview path={entry.path}
+        content={state.status === 'ready' ? state.content : ''} labels={labels.data} />
     case 'code':
       return <CodePreview entry={entry} content={state.status === 'ready' ? state.content : ''} />
   }
