@@ -6,7 +6,7 @@ DSH Right Sidebar 为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek
 提供原生的右侧产物工作区。它让 Agent 在一个会话中生成的报告、图表、图片、数据和文档
 留在对话旁边，而不是散落在工作区和工具记录中。
 
-![Output Dock 总览](docs/images/test1.png)
+![Output Dock 总览](docs/images/overview.png)
 
 ## 设计目标
 
@@ -43,7 +43,7 @@ Output Dock 不是文件管理器，也不展示项目里的每一个文件。�
 HTML 文件属于项目源码，而部署后的网页应由 Agent 在对话中提供可访问 URL。这样一个前后端
 项目生成大量 `js`、`ts`、`css` 和配置文件时，Output Dock 仍然只呈现真正的交付物。
 
-![Output Dock 中的预览](docs/images/test2.png)
+![Output Dock 中的预览](docs/images/preview.png)
 
 ## 使用方式
 

@@ -3,6 +3,16 @@
 All notable changes to DSH Right Sidebar are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses semantic versioning.
 
+## [0.3.2] - 2026-09-12
+
+### Added
+
+- `screenshots.json` declaring the two README screenshots for plugin-market storefronts; the images
+  were renamed to `docs/images/overview.png` and `docs/images/preview.png`.
+- npm packaging metadata: `repository` and `keywords` fields, so a future publish links back to this
+  repository and storefronts can categorize the plugin. A prebuilt tarball is attached to the GitHub
+  release for install-without-build.
+
 ## [0.3.1] - 2026-09-12
 
 ### Fixed

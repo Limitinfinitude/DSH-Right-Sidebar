@@ -7,7 +7,7 @@ DSH Right Sidebar is a native output workspace for
 diagrams, images, data, and documents generated in a session beside the conversation instead
 of scattering them across the workspace and tool history.
 
-![Output Dock overview](docs/images/test1.png)
+![Output Dock overview](docs/images/overview.png)
 
 ## Purpose
 
@@ -47,7 +47,7 @@ HTML files are project source. A deployed website should instead be provided by 
 accessible URL in the conversation. This keeps a frontend or full-stack project with many `js`,
 `ts`, `css`, and configuration files from drowning out its actual deliverables.
 
-![Output Dock preview](docs/images/test2.png)
+![Output Dock preview](docs/images/preview.png)
 
 ## Use
 
