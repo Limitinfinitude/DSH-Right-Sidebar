@@ -19,7 +19,8 @@ import { Preview, type SaveState } from './preview.tsx'
 import type { QcResult } from './qc.ts'
 import { mergeQcResult } from './qc-state.ts'
 import { qcIssueKey, qcSummaryKey } from './qc-labels.ts'
-import { authorizeFileContent, fileUrl } from './resources.ts'
+import { authorizeFileContent, fileUrl, outputFileSize } from './resources.ts'
+import { filterByGroup, formatBytes, kindGroup, type OutputGroup } from './output-groups.ts'
 import {
   catalogEntries, closedAllAt, directoryOfPath, filterCatalog, groupCatalogByTurn, orderedTabs,
   reconcileSelection, reorderTab, shouldAutoOpen, visibleTabs,
@@ -49,6 +50,14 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 const OUTPUT_SURFACE = 'output-dock'
+
+const FILTER_KEYS: Readonly<Record<OutputGroup | 'all', OutputDockKey>> = {
+  all: 'dock.filterAll',
+  doc: 'dock.filterDoc',
+  image: 'dock.filterImage',
+  data: 'dock.filterData',
+  media: 'dock.filterMedia',
+}
 
 /** Subscribe to just the output view snapshot of one session. */
 function useDockSnapshot(session: SessionFace | undefined): OutputDockSnapshot {
@@ -134,7 +143,13 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
   const [copied, setCopied] = useState<'path' | 'content' | null>(null)
   const [catalogOpen, setCatalogOpen] = useState(false)
   const [catalogQuery, setCatalogQuery] = useState('')
+  const [catalogGroup, setCatalogGroup] = useState<OutputGroup | 'all'>('all')
   const [hiddenOpen, setHiddenOpen] = useState(false)
+  const [sizes, setSizes] = useState<ReadonlyMap<string, {
+    readonly seq: number
+    readonly bytes: number | null
+  }>>(new Map())
+  const sizesRef = useRef(sizes)
   const [saveState, setSaveState] = useState<SaveState | null>(null)
   const [resizing, setResizing] = useState(false)
   const [liveWidth, setLiveWidth] = useState<number | null>(null)
@@ -167,9 +182,35 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
     () => snapshot.entries.filter(entry => hidden.has(entry.path)),
     [hidden, snapshot.entries],
   )
-  const filtered = useMemo(() => filterCatalog(catalog, catalogQuery), [catalog, catalogQuery])
+  const grouped = useMemo(() => filterByGroup(catalog, catalogGroup), [catalog, catalogGroup])
+  const filtered = useMemo(() => filterCatalog(grouped, catalogQuery), [grouped, catalogQuery])
   const groups = useMemo(() => groupCatalogByTurn(filtered), [filtered])
+  const groupCounts = useMemo(() => {
+    const counts = new Map<OutputGroup, number>()
+    for (const entry of catalog) {
+      const key = kindGroup(entry.kind)
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    return counts
+  }, [catalog])
   const width = liveWidth ?? persisted.width
+
+  useEffect(() => {
+    let stale = false
+    void Promise.all(snapshot.entries.map(async entry => {
+      if (sizesRef.current.get(entry.path)?.seq === entry.lastSeq) return null
+      const bytes = await outputFileSize(entry.path)
+      return stale ? null : { path: entry.path, seq: entry.lastSeq, bytes }
+    })).then(updates => {
+      const fresh = updates.filter(update => update !== null)
+      if (stale || fresh.length === 0) return
+      const next = new Map(sizesRef.current)
+      for (const update of fresh) next.set(update.path, { seq: update.seq, bytes: update.bytes })
+      sizesRef.current = next
+      setSizes(next)
+    })
+    return () => { stale = true }
+  }, [snapshot.entries])
 
   useEffect(() => {
     saveDockState(localStorage, persisted)
@@ -538,28 +579,50 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
                   onChange={event => { setCatalogQuery(event.target.value) }}
                 />
               </label>
+              <div className="dsh-od-catalog-filters" role="group" aria-label={t('dock.filter')}>
+                {(['all', 'doc', 'image', 'data', 'media'] as const).map(key => (
+                  <button
+                    type="button"
+                    key={key}
+                    className="dsh-od-catalog-chip"
+                    data-active={catalogGroup === key || undefined}
+                    aria-pressed={catalogGroup === key}
+                    onClick={() => { setCatalogGroup(key) }}
+                  >
+                    {t(FILTER_KEYS[key])}
+                    {key !== 'all' && (groupCounts.get(key) ?? 0) > 0
+                      ? <small>{groupCounts.get(key)}</small>
+                      : null}
+                  </button>
+                ))}
+              </div>
             </div>
             {groups.length === 0 && <div className="dsh-od-catalog-group">{t('dock.noMatch')}</div>}
             {groups.map(group => (
               <div role="group" aria-label={t('dock.turn', { turn: group.turn })} key={group.turn}>
                 <div className="dsh-od-catalog-group">{t('dock.turn', { turn: group.turn })}</div>
-                {group.entries.map(entry => (
-                  <button
-                    type="button"
-                    className="dsh-od-catalog-item"
-                    role="option"
-                    aria-selected={entry.path === selectedPath}
-                    key={entry.path}
-                    onClick={() => { reopen(entry) }}
-                    title={entry.path}
-                  >
-                    <span className={`dsh-od-kind dsh-od-kind-${entry.kind}`}>{entry.kind}</span>
-                    <span className="dsh-od-catalog-copy">
-                      <span>{basename(entry.path)}</span>
-                      <small>{entry.path}</small>
-                    </span>
-                  </button>
-                ))}
+                {group.entries.map(entry => {
+                  const size = sizes.get(entry.path)
+                  const sizeText = size?.bytes === undefined || size.bytes === null
+                    ? '' : ` · ${formatBytes(size.bytes)}`
+                  return (
+                    <button
+                      type="button"
+                      className="dsh-od-catalog-item"
+                      role="option"
+                      aria-selected={entry.path === selectedPath}
+                      key={entry.path}
+                      onClick={() => { reopen(entry) }}
+                      title={entry.path}
+                    >
+                      <span className={`dsh-od-kind dsh-od-kind-${entry.kind}`}>{entry.kind}</span>
+                      <span className="dsh-od-catalog-copy">
+                        <span>{basename(entry.path)}</span>
+                        <small>{entry.path}{sizeText}</small>
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
             ))}
             {visible.length > 0 && (

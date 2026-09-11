@@ -4,6 +4,8 @@ export declare function fileUrl(path: string, revision?: number): string;
 export declare function authorizeFileContent(path: string): Promise<string>;
 /** Save text-backed output content through the workspace-confined file route. */
 export declare function saveFileContent(path: string, content: string): Promise<void>;
+/** Byte size of one output via a HEAD probe; null when unknown (e.g. network outputs). */
+export declare function outputFileSize(path: string): Promise<number | null>;
 /** Resolve one resource reference found inside a preview document. */
 export declare function resolveResourceUrl(sourcePath: string, href: string): string;
 /** Normalize a sanitized SVG document for a contained sidebar preview. */

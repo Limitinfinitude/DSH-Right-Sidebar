@@ -998,10 +998,55 @@ export const DOCK_CSS = `
   top: 0;
   z-index: 1;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   padding: 4px 4px 6px;
   background: var(--dsw-alias-bg-base);
+}
+
+.dsh-od-catalog-filters {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.dsh-od-catalog-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 2px 9px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.dsh-od-catalog-chip:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.dsh-od-catalog-chip[data-active='true'] {
+  border-color: color-mix(in srgb, var(--dsw-alias-brand-primary) 40%, transparent);
+  background: color-mix(in srgb, var(--dsw-alias-brand-primary) 14%, transparent);
+  color: var(--dsw-alias-brand-primary);
+}
+
+.dsh-od-catalog-chip small {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dsh-od-catalog-chip[data-active='true'] small {
+  color: inherit;
+  opacity: 0.75;
 }
 
 .dsh-od-catalog-search {

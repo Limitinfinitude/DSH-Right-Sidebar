@@ -26,6 +26,21 @@ export async function saveFileContent(path: string, content: string): Promise<vo
   if (!response.ok) throw new Error(String(response.status))
 }
 
+/** Byte size of one output via a HEAD probe; null when unknown (e.g. network outputs). */
+export async function outputFileSize(path: string): Promise<number | null> {
+  try {
+    const source = await authorizeFileContent(path)
+    const response = await fetch(fileUrl(source), { method: 'HEAD' })
+    if (!response.ok) return null
+    const length = response.headers.get('Content-Length')
+    if (length === null) return null
+    const bytes = Number(length)
+    return Number.isFinite(bytes) && bytes >= 0 ? bytes : null
+  } catch {
+    return null
+  }
+}
+
 function isSiblingReference(href: string): boolean {
   return href !== ''
     && !href.startsWith('#')

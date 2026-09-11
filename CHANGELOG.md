@@ -3,6 +3,16 @@
 All notable changes to DSH Right Sidebar are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses semantic versioning.
 
+## [0.4.0] - 2026-09-12
+
+### Added
+
+- Catalog type filters: All / Docs / Images / Data / Media chips with per-group counts, combinable
+  with the existing text search (`src/client/output-groups.ts`).
+- File sizes in the catalog. Each output is probed with a HEAD request through the existing file
+  route after authorization, cached per revision, and refreshed when the agent rewrites the file.
+  Network outputs report no size.
+
 ## [0.3.2] - 2026-09-12
 
 ### Added

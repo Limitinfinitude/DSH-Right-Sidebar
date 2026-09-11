@@ -20,7 +20,9 @@ dependencies, and HTML source files remain the responsibility of the DSH workspa
 - Automatic refresh when the agent updates an output at the same path
 - HTTP(S) file URLs explicitly delivered by the agent, plus uniquely matched incomplete workspace paths
 - Closeable, draggable stacked tabs that retain readable names in a narrow sidebar
-- A footer catalog that reopens closed outputs, filters them by name or path, and groups them by turn
+- A footer catalog that filters outputs by type (docs, images, data, media, with counts), searches by
+  name or path, groups them by turn, and reopens closed outputs or closes every tab at once
+- File sizes in the catalog, refreshed whenever the agent rewrites the same output
 - Direct, rendered Markdown editing with silent save after typing stops, plus saving and failure feedback
 - Copy path or content, download, reveal the containing directory, pin, or hide an output
 - A quality-check badge that surfaces broken links, SVG and HTML problems, and failed media loads

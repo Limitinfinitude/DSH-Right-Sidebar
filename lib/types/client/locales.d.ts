@@ -31,6 +31,12 @@ export declare const zh: {
     'dock.saved': string;
     'dock.search': string;
     'dock.noMatch': string;
+    'dock.filter': string;
+    'dock.filterAll': string;
+    'dock.filterDoc': string;
+    'dock.filterImage': string;
+    'dock.filterData': string;
+    'dock.filterMedia': string;
     'dock.closeAll': string;
     'dock.resize': string;
     'dock.hiddenCount': string;
