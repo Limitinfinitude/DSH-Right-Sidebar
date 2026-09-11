@@ -14,9 +14,12 @@ export interface PublishedOutput extends ProducedOutputCandidate {
 }
 
 const AUTOMATIC_EXTENSIONS = new Set([
-  'md', 'mdx', 'pdf', 'svg', 'png', 'jpg', 'jpeg', 'webp', 'gif', 'avif', 'bmp',
+  'md', 'mdx', 'markdown', 'pdf', 'svg', 'png', 'jpg', 'jpeg', 'jfif', 'webp', 'gif',
+  'avif', 'bmp', 'ico', 'tif', 'tiff',
+  'mp4', 'm4v', 'webm', 'ogv', 'mov',
+  'mp3', 'wav', 'ogg', 'oga', 'opus', 'm4a', 'flac', 'aac',
 ])
-const EXPLICIT_EXTENSIONS = new Set(['json', 'jsonl', 'csv', 'tsv', 'txt'])
+const EXPLICIT_EXTENSIONS = new Set(['json', 'jsonl', 'csv', 'tsv', 'txt', 'ipynb'])
 const MENTIONED_EXTENSION_PATTERN = [
   ...AUTOMATIC_EXTENSIONS, ...EXPLICIT_EXTENSIONS,
 ].sort((left, right) => right.length - left.length).join('|')

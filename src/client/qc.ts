@@ -12,7 +12,7 @@ export type QcLevel = 'ok' | 'warn' | 'error' | 'loading'
 export interface QcIssue {
   readonly level: 'warn' | 'error'
   readonly code: 'md-broken-link' | 'md-unbalanced-fence' | 'svg-parse' | 'svg-no-viewbox'
-    | 'svg-sanitized' | 'image-failed' | 'html-parse' | 'file-read'
+    | 'svg-sanitized' | 'image-failed' | 'html-parse' | 'file-read' | 'media-failed'
   readonly count?: number
 }
 

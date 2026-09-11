@@ -5,7 +5,7 @@
 import type { ConversationLocation, ConversationViewNode } from '@deepseek-ai/dsh-client-runtime/client';
 import type { OutputPublication } from './output-policy.ts';
 /** Preview category an output file renders as. */
-export type OutputKind = 'md' | 'svg' | 'image' | 'html' | 'pdf' | 'text' | 'code';
+export type OutputKind = 'md' | 'svg' | 'image' | 'html' | 'pdf' | 'text' | 'code' | 'video' | 'audio';
 /** Binary previews stay read-only; text-backed documents may be edited in place. */
 export declare function isEditableKind(kind: OutputKind): boolean;
 /** Source files belong in the agent transcript and workspace, not the outputs dock. */

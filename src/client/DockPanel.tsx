@@ -1,7 +1,7 @@
 /** Native details-column output viewer and its inactive edge launcher. */
 import {
-  Check, Clipboard, Download, ExternalLink, EyeOff, Files, FolderOpen, Link, List,
-  PanelRightClose, Pin, PinOff, RotateCcw, X,
+  AlertTriangle, Check, Clipboard, Download, ExternalLink, Eye, EyeOff, Files, FolderOpen,
+  Link, List, PanelRightClose, Pin, PinOff, RotateCcw, Search, ShieldCheck, X,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ISessions, SessionFace } from '@deepseek-ai/dsh-client-runtime/client'
@@ -11,17 +11,18 @@ import { isNetworkOutput } from '../formats.ts'
 import type { OutputDockSnapshot, OutputEntry } from './contract.ts'
 import { EMPTY_OUTPUT_DOCK_SNAPSHOT } from './contract.ts'
 import {
-  EMPTY_SESSION_PERSISTED, loadDockState, saveDockState,
+  clampDockWidth, EMPTY_SESSION_PERSISTED, loadDockState, saveDockState,
   type PersistedState, type SessionPersistedState,
 } from './dock-persistence.ts'
 import type { NS, OutputDockKey } from './locales.ts'
-import { Preview } from './preview.tsx'
+import { Preview, type SaveState } from './preview.tsx'
 import type { QcResult } from './qc.ts'
 import { mergeQcResult } from './qc-state.ts'
+import { qcIssueKey, qcSummaryKey } from './qc-labels.ts'
 import { authorizeFileContent, fileUrl } from './resources.ts'
 import {
-  catalogEntries, directoryOfPath, orderedTabs, reconcileSelection, reorderTab, shouldAutoOpen,
-  visibleTabs,
+  catalogEntries, closedAllAt, directoryOfPath, filterCatalog, groupCatalogByTurn, orderedTabs,
+  reconcileSelection, reorderTab, shouldAutoOpen, visibleTabs,
 } from './sidebar-state.ts'
 import {
   dockRenderTarget, getCompactViewport, subscribeCompactViewport,
@@ -124,14 +125,22 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
   const session = sessionId === undefined ? undefined : sessions.binding(sessionId)?.session
   const snapshot = useDockSnapshot(session)
   const surface = useDetailsSurface(layout)
+  const compact = useCompactViewport()
   const [persisted, setPersisted] = useState<PersistedState>(() => loadDockState(localStorage))
   const [draggedPath, setDraggedPath] = useState<string | null>(null)
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
   const [qcByPath, setQcByPath] = useState<ReadonlyMap<string, QcResult>>(new Map())
+  const [qcOpen, setQcOpen] = useState(false)
   const [copied, setCopied] = useState<'path' | 'content' | null>(null)
   const [catalogOpen, setCatalogOpen] = useState(false)
+  const [catalogQuery, setCatalogQuery] = useState('')
+  const [hiddenOpen, setHiddenOpen] = useState(false)
+  const [saveState, setSaveState] = useState<SaveState | null>(null)
+  const [resizing, setResizing] = useState(false)
+  const [liveWidth, setLiveWidth] = useState<number | null>(null)
   const selectedRef = useRef<string | null>(null)
   const seenSeqRef = useRef(0)
+  const liveWidthRef = useRef<number | null>(null)
 
   const pinned = useMemo(() => new Set(persisted.pinned), [persisted.pinned])
   const hidden = useMemo(() => new Set(persisted.hidden), [persisted.hidden])
@@ -154,10 +163,23 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
     () => catalogEntries(snapshot.entries, hidden),
     [hidden, snapshot.entries],
   )
+  const hiddenEntries = useMemo(
+    () => snapshot.entries.filter(entry => hidden.has(entry.path)),
+    [hidden, snapshot.entries],
+  )
+  const filtered = useMemo(() => filterCatalog(catalog, catalogQuery), [catalog, catalogQuery])
+  const groups = useMemo(() => groupCatalogByTurn(filtered), [filtered])
+  const width = liveWidth ?? persisted.width
 
   useEffect(() => {
     saveDockState(localStorage, persisted)
   }, [persisted])
+
+  useEffect(() => {
+    if (saveState !== 'saved') return
+    const id = window.setTimeout(() => { setSaveState(null) }, 1500)
+    return () => { window.clearTimeout(id) }
+  }, [saveState])
 
   const updateSessionState = (update: (state: SessionPersistedState) => SessionPersistedState): void => {
     if (sessionId === undefined) return
@@ -183,6 +205,7 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
 
   const selected = visible.find(entry => entry.path === selectedPath) ?? null
   const hiddenCount = hidden.size
+  const qc = selectedPath === null ? undefined : qcByPath.get(selectedPath)
 
   const select = (path: string): void => {
     selectedRef.current = path
@@ -194,6 +217,7 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
   const onPreviewResult = useCallback((result: QcResult) => {
     if (selectedPath !== null) setQc(selectedPath, result)
   }, [selectedPath, setQc])
+  const onSave = useCallback((state: SaveState) => { setSaveState(state) }, [])
   const copy = async (text: string, kind: 'path' | 'content'): Promise<void> => {
     try {
       await navigator.clipboard.writeText(text)
@@ -244,6 +268,9 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
   const hide = (path: string): void => {
     setPersisted(previous => ({ ...previous, hidden: [...new Set([...previous.hidden, path])] }))
   }
+  const unhide = (path: string): void => {
+    setPersisted(previous => ({ ...previous, hidden: previous.hidden.filter(item => item !== path) }))
+  }
   const clearHidden = (): void => {
     setPersisted(previous => ({ ...previous, hidden: [] }))
   }
@@ -251,6 +278,12 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
     updateSessionState(previous => ({
       ...previous,
       closedAt: { ...previous.closedAt, [entry.path]: entry.lastSeq },
+    }))
+  }
+  const closeAllTabs = (): void => {
+    updateSessionState(previous => ({
+      ...previous,
+      closedAt: { ...previous.closedAt, ...closedAllAt(visible) },
     }))
   }
   const reopen = (entry: OutputEntry): void => {
@@ -267,11 +300,80 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
     updateSessionState(previous => ({ ...previous, order }))
     setDraggedPath(null)
   }
+  const startResize = (event: React.MouseEvent<HTMLDivElement>): void => {
+    event.preventDefault()
+    const origin = event.clientX
+    const base = persisted.width
+    setResizing(true)
+    const onMove = (move: MouseEvent): void => {
+      const next = clampDockWidth(base + (origin - move.clientX))
+      liveWidthRef.current = next
+      setLiveWidth(next)
+    }
+    const onUp = (): void => {
+      setResizing(false)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      const next = liveWidthRef.current
+      liveWidthRef.current = null
+      setLiveWidth(null)
+      if (next !== null) setPersisted(previous => ({ ...previous, width: next }))
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        setCatalogOpen(false)
+        setQcOpen(false)
+        setHiddenOpen(false)
+        return
+      }
+      if (!event.altKey || event.ctrlKey || event.metaKey) return
+      if (event.code === 'BracketRight' || event.code === 'BracketLeft') {
+        if (visible.length === 0) return
+        event.preventDefault()
+        const step = event.code === 'BracketRight' ? 1 : -1
+        const index = visible.findIndex(entry => entry.path === selectedPath)
+        const next = visible[(index + step + visible.length) % visible.length]
+        if (next !== undefined) select(next.path)
+        return
+      }
+      if (event.code === 'KeyW') {
+        if (selected === null) return
+        event.preventDefault()
+        closeTab(selected)
+        return
+      }
+      if (event.code === 'KeyO') {
+        event.preventDefault()
+        if (surface === OUTPUT_SURFACE) layout.closeDetails()
+        else layout.openDetails(OUTPUT_SURFACE)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('keydown', onKey) }
+  }, [layout, selected, selectedPath, surface, visible])
 
   if (surface !== OUTPUT_SURFACE) return null
 
   return (
-    <section className="dsh-od-panel" aria-label={t('dock.title')}>
+    <section
+      className="dsh-od-panel"
+      aria-label={t('dock.title')}
+      style={compact ? undefined : { width }}
+    >
+      {!compact && (
+        <div
+          className="dsh-od-resize"
+          role="separator"
+          aria-label={t('dock.resize')}
+          data-active={resizing || undefined}
+          onMouseDown={startResize}
+        />
+      )}
       <header className="dsh-od-header">
         <div className="dsh-od-tabs" role="tablist" aria-label={t('dock.chooseFile')}>
           {visible.map(entry => (
@@ -341,6 +443,7 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
                 key={selected.path}
                 entry={selected}
                 onResult={onPreviewResult}
+                onSaveState={onSave}
                 labels={{
                   loading: t('preview.loading'),
                   error: t('preview.error'),
@@ -372,37 +475,141 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
                     refresh: t('preview.refresh'),
                     openExternal: t('preview.openExternal'),
                   },
+                  video: {
+                    title: t('preview.video'),
+                    openExternal: t('preview.openExternal'),
+                  },
+                  audio: {
+                    title: t('preview.audio'),
+                    openExternal: t('preview.openExternal'),
+                  },
                 }}
               />
           </div>
         )}
 
       <footer className="dsh-od-footer">
-        {catalogOpen && (
-          <div className="dsh-od-catalog" role="listbox" aria-label={t('dock.openCatalog')}>
-            {catalog.map(entry => (
-              <button
-                type="button"
-                className="dsh-od-catalog-item"
-                role="option"
-                aria-selected={entry.path === selectedPath}
-                key={entry.path}
-                onClick={() => { reopen(entry) }}
-                title={entry.path}
-              >
+        {hiddenOpen && hiddenEntries.length > 0 && (
+          <div className="dsh-od-catalog" role="listbox" aria-label={t('dock.clearHidden')}>
+            <div className="dsh-od-catalog-group">{t('dock.hiddenCount', { count: hiddenCount })}</div>
+            {hiddenEntries.map(entry => (
+              <div className="dsh-od-catalog-item" key={entry.path}>
                 <span className={`dsh-od-kind dsh-od-kind-${entry.kind}`}>{entry.kind}</span>
                 <span className="dsh-od-catalog-copy">
                   <span>{basename(entry.path)}</span>
                   <small>{entry.path}</small>
                 </span>
-              </button>
+                <IconButton label={t('dock.unhide')} onClick={() => { unhide(entry.path) }}>
+                  <Eye size={16} aria-hidden />
+                </IconButton>
+              </div>
             ))}
+            <div className="dsh-od-catalog-foot">
+              <button type="button" className="dsh-od-text-btn" onClick={clearHidden}>
+                <RotateCcw size={14} aria-hidden />{t('dock.clearHidden')}
+              </button>
+            </div>
+          </div>
+        )}
+        {qcOpen && qc !== undefined && (
+          <div className="dsh-od-qc" aria-live="polite">
+            <div className="dsh-od-qc-title">{t('qc.title')}</div>
+            <ul className="dsh-od-qc-list">
+              {qc.issues.length === 0
+                ? <li>{t('qc.ok')}</li>
+                : qc.issues.map((issue, index) => (
+                  <li key={`${issue.code}:${index}`} data-level={issue.level}>
+                    {t(qcIssueKey(issue.code), issue.count === undefined ? undefined : { count: issue.count })}
+                  </li>
+                ))}
+            </ul>
+          </div>
+        )}
+        {catalogOpen && (
+          <div className="dsh-od-catalog" role="listbox" aria-label={t('dock.openCatalog')}>
+            <div className="dsh-od-catalog-tools">
+              <label className="dsh-od-catalog-search">
+                <Search size={14} aria-hidden />
+                <input
+                  type="search"
+                  value={catalogQuery}
+                  placeholder={t('dock.search')}
+                  aria-label={t('dock.search')}
+                  onChange={event => { setCatalogQuery(event.target.value) }}
+                />
+              </label>
+            </div>
+            {groups.length === 0 && <div className="dsh-od-catalog-group">{t('dock.noMatch')}</div>}
+            {groups.map(group => (
+              <div role="group" aria-label={t('dock.turn', { turn: group.turn })} key={group.turn}>
+                <div className="dsh-od-catalog-group">{t('dock.turn', { turn: group.turn })}</div>
+                {group.entries.map(entry => (
+                  <button
+                    type="button"
+                    className="dsh-od-catalog-item"
+                    role="option"
+                    aria-selected={entry.path === selectedPath}
+                    key={entry.path}
+                    onClick={() => { reopen(entry) }}
+                    title={entry.path}
+                  >
+                    <span className={`dsh-od-kind dsh-od-kind-${entry.kind}`}>{entry.kind}</span>
+                    <span className="dsh-od-catalog-copy">
+                      <span>{basename(entry.path)}</span>
+                      <small>{entry.path}</small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ))}
+            {visible.length > 0 && (
+              <div className="dsh-od-catalog-foot">
+                <button type="button" className="dsh-od-text-btn" onClick={closeAllTabs}>
+                  <X size={14} aria-hidden />{t('dock.closeAll')}
+                </button>
+              </div>
+            )}
           </div>
         )}
         <div className="dsh-od-toolbar">
           <IconButton label={t('dock.openCatalog')} active={catalogOpen} onClick={() => { setCatalogOpen(current => !current) }}>
             <List size={16} aria-hidden />
           </IconButton>
+          {hiddenCount > 0 && (
+            <IconButton
+              label={t('dock.hiddenCount', { count: hiddenCount })}
+              active={hiddenOpen}
+              onClick={() => { setHiddenOpen(current => !current) }}
+            >
+              <EyeOff size={16} aria-hidden />
+            </IconButton>
+          )}
+          {qc !== undefined && qc.level !== 'loading' && (
+            <IconButton
+              label={qc.issues.length === 0
+                ? t('qc.ok')
+                : t(qcSummaryKey(qc) ?? 'qc.ok', qc.issues[0]?.count === undefined
+                  ? undefined
+                  : { count: qc.issues[0]?.count })}
+              active={qcOpen}
+              onClick={() => { setQcOpen(current => !current) }}
+            >
+              {qc.level === 'ok'
+                ? <ShieldCheck size={16} aria-hidden />
+                : <AlertTriangle size={16} aria-hidden />}
+            </IconButton>
+          )}
+          {saveState === 'saving' && (
+            <span className="dsh-od-status">{t('dock.saving')}</span>
+          )}
+          {saveState === 'saved' && (
+            <span className="dsh-od-status" data-state="ok">
+              <Check size={12} aria-hidden />{t('dock.saved')}
+            </span>
+          )}
+          {saveState === 'error' && (
+            <span className="dsh-od-status" data-state="error">{t('dock.saveError')}</span>
+          )}
           {selected !== null && (
             <div className="dsh-od-toolbar-actions">
                 <IconButton label={copied === 'path' ? t('dock.copied') : t('dock.copyPath')} onClick={() => { void copy(selected.path, 'path') }}>
@@ -411,7 +618,8 @@ function OutputDockSurface(props: SurfaceProps): React.JSX.Element | null {
                 <IconButton
                   label={copied === 'content' ? t('dock.copied') : t('dock.copyContent')}
                   onClick={() => { void copyContent(selected) }}
-                  disabled={selected.kind === 'image' || selected.kind === 'pdf'}
+                  disabled={selected.kind === 'image' || selected.kind === 'pdf'
+                    || selected.kind === 'video' || selected.kind === 'audio'}
                 >
                   {copied === 'content' ? <Check size={16} aria-hidden /> : <Clipboard size={16} aria-hidden />}
                 </IconButton>

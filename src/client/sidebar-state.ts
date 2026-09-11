@@ -27,6 +27,49 @@ export function visibleTabs(
       || right.lastSeq - left.lastSeq)
 }
 
+/** One catalog section: every output first produced in the same turn. */
+export interface CatalogGroup {
+  readonly turn: number
+  readonly entries: readonly OutputEntry[]
+}
+
+/** Group session history by the turn that first produced each output, newest turn first. */
+export function groupCatalogByTurn(
+  entries: readonly OutputEntry[],
+): readonly CatalogGroup[] {
+  const groups = new Map<number, OutputEntry[]>()
+  for (const entry of entries) {
+    const bucket = groups.get(entry.firstTurn)
+    if (bucket === undefined) groups.set(entry.firstTurn, [entry])
+    else bucket.push(entry)
+  }
+  return [...groups.entries()]
+    .sort((left, right) => right[0] - left[0])
+    .map(([turn, list]) => ({
+      turn,
+      entries: [...list].sort((left, right) => right.lastSeq - left.lastSeq),
+    }))
+}
+
+/** Case-insensitive catalog filter across file name and full path. */
+export function filterCatalog(
+  entries: readonly OutputEntry[],
+  query: string,
+): readonly OutputEntry[] {
+  const needle = query.trim().toLocaleLowerCase()
+  if (needle === '') return entries
+  return entries.filter(entry => entry.path.toLocaleLowerCase().includes(needle))
+}
+
+/** Close every listed tab at its current revision so nothing reopens by itself. */
+export function closedAllAt(
+  entries: readonly OutputEntry[],
+): Readonly<Record<string, number>> {
+  const closedAt: Record<string, number> = {}
+  for (const entry of entries) closedAt[entry.path] = entry.lastSeq
+  return closedAt
+}
+
 /** Session history stays available after closing tabs; explicitly hidden files do not. */
 export function catalogEntries(
   entries: readonly OutputEntry[],

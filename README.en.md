@@ -20,22 +20,27 @@ dependencies, and HTML source files remain the responsibility of the DSH workspa
 - Automatic refresh when the agent updates an output at the same path
 - HTTP(S) file URLs explicitly delivered by the agent, plus uniquely matched incomplete workspace paths
 - Closeable, draggable stacked tabs that retain readable names in a narrow sidebar
-- A footer catalog that reopens closed outputs and scrolls independently after seven entries
-- Direct, rendered Markdown editing with silent save after typing stops
+- A footer catalog that reopens closed outputs, filters them by name or path, and groups them by turn
+- Direct, rendered Markdown editing with silent save after typing stops, plus saving and failure feedback
 - Copy path or content, download, reveal the containing directory, pin, or hide an output
+- A quality-check badge that surfaces broken links, SVG and HTML problems, and failed media loads
+- Per-item unhide with a hidden count, and a draggable edge that persists the sidebar width
+- Keyboard shortcuts: `Alt+]` / `Alt+[` cycle outputs, `Alt+W` closes the current tab, `Alt+O` toggles the
+  sidebar, and `Esc` dismisses popovers
 
 ## Preview Coverage
 
 | Category | Supported now |
 | --- | --- |
-| Automatic outputs | Markdown, MDX, PDF, SVG, PNG, JPEG, WebP, GIF, AVIF, and BMP |
-| On-demand outputs | TXT, JSON, JSONL, CSV, and TSV; shown only when the agent explicitly mentions the file path or name |
+| Automatic outputs | Markdown (`md`, `mdx`, `markdown`), PDF, SVG, images (PNG, JPEG, WebP, GIF, AVIF, BMP, ICO, TIFF), video (MP4, M4V, WebM, OGV, MOV), and audio (MP3, WAV, OGG, OGA, OPUS, M4A, FLAC, AAC) |
+| On-demand outputs | TXT, JSON, JSONL, CSV, TSV, and IPYNB; shown only when the agent explicitly mentions the file path or name |
 | Not displayed | Source, HTML/HTM, configuration, logs, YAML, TOML, XML, INI, CONF, and other project-internal files |
 
 - JSON/JSONL: collapsible tree, search, expand/collapse all, formatted raw view, and invalid-line reporting
 - CSV/TSV: quoted and multiline fields, filtering, numeric/text sorting, pagination, and resizable columns
 - TXT: line numbers, full-text search, match count, wrapping, and 250-line pages for bounded DOM size
 - Image/SVG: fit, actual size, zoom, drag-to-pan, dimensions, and a transparency checkerboard
+- Video/Audio: the browser's native player with an external-open control; nothing is transcoded
 - PDF: the browser's built-in PDF reader with refresh and external-open controls
 
 HTML files are project source. A deployed website should instead be provided by the agent as an
@@ -71,7 +76,8 @@ Refresh the DSH Web session after installation.
 
 The dock does not poll files or ports while idle. Output content is fetched only after selection,
 and complex previews initialize on demand. JSON search traverses the data once, tables are capped at
-10,000 rows, and TXT rendering is paginated. The browser bundle is approximately `185 KB gzip`.
+10,000 rows, and TXT rendering is paginated. Media files stream through native players without being
+fetched as text. The browser bundle is approximately `188 KB gzip`.
 
 Files inside a workspace are path-validated. Agent-produced outputs outside registered workspaces
 can be accessed temporarily after same-origin authorization from DSH. Up to 256 authorized external

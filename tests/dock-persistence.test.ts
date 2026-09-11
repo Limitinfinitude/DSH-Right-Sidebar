@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { EMPTY_PERSISTED, loadDockState, saveDockState } from '../src/client/dock-persistence.ts'
+import {
+  clampDockWidth, DEFAULT_DOCK_WIDTH, EMPTY_PERSISTED, loadDockState, MAX_DOCK_WIDTH,
+  MIN_DOCK_WIDTH, saveDockState,
+} from '../src/client/dock-persistence.ts'
 
 let storage: Storage
 
@@ -31,5 +34,21 @@ describe('output dock persistence', () => {
     expect(loadDockState(storage)).toEqual(EMPTY_PERSISTED)
     storage.setItem('dsh-output-dock:v3', '{broken')
     expect(loadDockState(storage)).toEqual(EMPTY_PERSISTED)
+  })
+
+  it('keeps a dragged sidebar width across reloads and clamps out-of-range values', () => {
+    saveDockState(storage, { ...EMPTY_PERSISTED, width: 640 })
+    expect(loadDockState(storage).width).toBe(640)
+
+    saveDockState(storage, { ...EMPTY_PERSISTED, width: 24 })
+    expect(loadDockState(storage).width).toBe(MIN_DOCK_WIDTH)
+
+    saveDockState(storage, { ...EMPTY_PERSISTED, width: 4000 })
+    expect(loadDockState(storage).width).toBe(MAX_DOCK_WIDTH)
+  })
+
+  it('falls back to the default width for missing or non-numeric values', () => {
+    expect(clampDockWidth(Number.NaN)).toBe(DEFAULT_DOCK_WIDTH)
+    expect(loadDockState(storage).width).toBe(DEFAULT_DOCK_WIDTH)
   })
 })

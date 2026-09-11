@@ -82,9 +82,12 @@ function useTextPreview(entry: OutputEntry, access: FileAccessState): TextPrevie
   return state
 }
 
-export function MarkdownPreview({ source, content }: {
+export type SaveState = 'saving' | 'saved' | 'error'
+
+export function MarkdownPreview({ source, content, onSaveState }: {
   source: string
   content: string
+  onSaveState?: (state: SaveState) => void
 }): React.JSX.Element {
   const html = useMemo(() => prepareHtmlFragment(
     source,
@@ -105,7 +108,13 @@ export function MarkdownPreview({ source, content }: {
     if (markdown === latest.current) return
     if (timer.current !== null) window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => {
-      void saveFileContent(source, markdown).then(() => { latest.current = markdown }).catch(() => {})
+      onSaveState?.('saving')
+      void saveFileContent(source, markdown)
+        .then(() => {
+          latest.current = markdown
+          onSaveState?.('saved')
+        })
+        .catch(() => { onSaveState?.('error') })
     }, 700)
   }
   if (isNetworkOutput(source)) {
@@ -205,6 +214,45 @@ export function PdfPreview({ entry, source, onResult, labels }: {
   )
 }
 
+/** Playable media (video/audio) rendered through the browser's native controls. */
+export function MediaFilePreview({ entry, source, kind, onResult, labels }: {
+  entry: OutputEntry
+  source: string
+  kind: 'video' | 'audio'
+  onResult: (result: QcResult) => void
+  labels: { readonly title: string; readonly openExternal: string }
+}): React.JSX.Element {
+  const src = fileUrl(source, entry.lastSeq)
+  const onError = (): void => {
+    onResult({ level: 'error', issues: [{ level: 'error', code: 'media-failed' }] })
+  }
+  return (
+    <section className="dsh-od-media-file" aria-label={labels.title}>
+      <div className="dsh-od-media-toolbar">
+        <span className="dsh-od-media-meta">{labels.title}</span>
+        <div className="dsh-od-data-actions">
+          <button type="button" className="dsh-od-data-button" aria-label={labels.openExternal}
+            title={labels.openExternal}
+            onClick={() => { window.open(src, '_blank', 'noopener,noreferrer') }}>
+            <ExternalLink size={15} aria-hidden />
+          </button>
+        </div>
+      </div>
+      {kind === 'video'
+        ? (
+          <video className="dsh-od-preview-media" src={src} controls preload="metadata"
+            onLoadedMetadata={() => { onResult({ level: 'ok', issues: [] }) }} onError={onError} />
+        )
+        : (
+          <div className="dsh-od-audio-stage">
+            <audio className="dsh-od-preview-audio" src={src} controls preload="metadata"
+              onLoadedMetadata={() => { onResult({ level: 'ok', issues: [] }) }} onError={onError} />
+          </div>
+        )}
+    </section>
+  )
+}
+
 export interface PreviewLabels {
   readonly loading: string
   readonly error: string
@@ -212,11 +260,14 @@ export interface PreviewLabels {
   readonly data: DataPreviewLabels
   readonly media: MediaPreviewLabels
   readonly pdf: { readonly refresh: string; readonly openExternal: string }
+  readonly video: { readonly title: string; readonly openExternal: string }
+  readonly audio: { readonly title: string; readonly openExternal: string }
 }
 
-export function Preview({ entry, onResult, labels }: {
+export function Preview({ entry, onResult, onSaveState, labels }: {
   entry: OutputEntry
   onResult: (result: QcResult) => void
+  onSaveState?: (state: SaveState) => void
   labels: PreviewLabels
 }): React.JSX.Element {
   const access = useFileAccess(entry)
@@ -259,7 +310,7 @@ export function Preview({ entry, onResult, labels }: {
   switch (entry.kind) {
     case 'md':
       return <MarkdownPreview source={access.source}
-        content={state.status === 'ready' ? state.content : ''} />
+        content={state.status === 'ready' ? state.content : ''} onSaveState={onSaveState} />
     case 'svg':
       return <SvgPreview entry={entry} source={access.source}
         content={state.status === 'ready' ? state.content : ''}
@@ -273,6 +324,12 @@ export function Preview({ entry, onResult, labels }: {
     case 'pdf':
       return <PdfPreview entry={entry} source={access.source}
         onResult={onResult} labels={labels.pdf} />
+    case 'video':
+      return <MediaFilePreview entry={entry} source={access.source} kind="video"
+        onResult={onResult} labels={labels.video} />
+    case 'audio':
+      return <MediaFilePreview entry={entry} source={access.source} kind="audio"
+        onResult={onResult} labels={labels.audio} />
     case 'text':
       return <DataFilePreview path={entry.path}
         content={state.status === 'ready' ? state.content : ''} labels={labels.data} />

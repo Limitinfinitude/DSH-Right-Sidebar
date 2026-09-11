@@ -28,6 +28,11 @@ export declare const zh: {
     'dock.reveal': string;
     'dock.turn': string;
     'dock.copied': string;
+    'dock.saved': string;
+    'dock.search': string;
+    'dock.noMatch': string;
+    'dock.closeAll': string;
+    'dock.resize': string;
     'dock.hiddenCount': string;
     'preview.loading': string;
     'preview.error': string;
@@ -53,6 +58,10 @@ export declare const zh: {
     'preview.dimensions': string;
     'preview.refresh': string;
     'preview.openExternal': string;
+    'preview.video': string;
+    'preview.audio': string;
+    'qc.title': string;
+    'qc.mediaFailed': string;
     'qc.ok': string;
     'qc.brokenLink': string;
     'qc.unbalancedFence': string;

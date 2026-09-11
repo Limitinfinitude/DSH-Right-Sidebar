@@ -18,10 +18,12 @@ const labels: PreviewLabels = {
     transparency: 'Transparency', dimensions: (width, height) => `${width}x${height}`,
   },
   pdf: { refresh: 'Refresh', openExternal: 'Open external' },
+  video: { title: 'Video', openExternal: 'Open external' },
+  audio: { title: 'Audio', openExternal: 'Open external' },
 }
 
-function entry(path: string): OutputEntry {
-  return { path, kind: 'md', firstTurn: 1, lastTurn: 1, lastSeq: 8 }
+function entry(path: string, kind: OutputEntry['kind'] = 'md'): OutputEntry {
+  return { path, kind, firstTurn: 1, lastTurn: 1, lastSeq: 8 }
 }
 
 afterEach(() => {
@@ -63,6 +65,29 @@ describe('preview source authorization', () => {
     await screen.findByRole('heading', { name: 'Remote report' })
     await waitFor(() => {
       expect(container.querySelector('.dsh-od-preview-md')?.getAttribute('contenteditable')).toBeNull()
+    })
+  })
+
+  it.each([
+    ['clip.mp4', 'video', 'video'],
+    ['voice.mp3', 'audio', 'audio'],
+  ])('renders %s through native %s controls without fetching text', async (path, kind, tag) => {
+    vi.stubGlobal('fetch', vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === 'POST') return new Response(null, {
+        status: 204,
+        headers: { 'X-Output-Dock-Resolved': encodeURIComponent(path) },
+      })
+      throw new Error('media previews must not read file text')
+    }))
+
+    const { container } = render(
+      <Preview entry={entry(path, kind as OutputEntry['kind'])} onResult={() => {}} labels={labels} />,
+    )
+
+    await waitFor(() => {
+      const element = container.querySelector(tag)
+      expect(element).not.toBeNull()
+      expect(element?.getAttribute('src')).toContain(encodeURIComponent(path))
     })
   })
 })

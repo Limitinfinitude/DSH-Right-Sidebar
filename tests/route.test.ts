@@ -124,7 +124,9 @@ describe('output dock file route', () => {
     }) as never, authorize.face)
 
     expect(authorize.value.status).toBe(204)
-    expect(decodeURIComponent(authorize.value.headers?.['X-Output-Dock-Resolved'] ?? '')).toBe(file)
+    // Windows temp directories can differ in case between TMPDIR and fs.realpath.
+    const resolved = decodeURIComponent(authorize.value.headers?.['X-Output-Dock-Resolved'] ?? '')
+    expect(resolved.toLocaleLowerCase()).toBe(file.toLocaleLowerCase())
   })
 
   it('rejects an incomplete basename when multiple workspace files match', async () => {

@@ -7,10 +7,11 @@ import type { OutputPublication } from './output-policy.ts'
 
 /** Preview category an output file renders as. */
 export type OutputKind = 'md' | 'svg' | 'image' | 'html' | 'pdf' | 'text' | 'code'
+  | 'video' | 'audio'
 
 /** Binary previews stay read-only; text-backed documents may be edited in place. */
 export function isEditableKind(kind: OutputKind): boolean {
-  return kind !== 'image' && kind !== 'pdf'
+  return kind !== 'image' && kind !== 'pdf' && kind !== 'video' && kind !== 'audio'
 }
 
 /** Source files belong in the agent transcript and workspace, not the outputs dock. */

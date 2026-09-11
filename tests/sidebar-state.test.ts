@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { OutputEntry } from '../src/client/contract.ts'
-import { reconcileSelection, shouldAutoOpen } from '../src/client/sidebar-state.ts'
+import {
+  closedAllAt, filterCatalog, groupCatalogByTurn, reconcileSelection, shouldAutoOpen,
+} from '../src/client/sidebar-state.ts'
 
 function entry(path: string, lastSeq: number): OutputEntry {
   return { path, kind: 'text', firstTurn: 1, lastTurn: 1, lastSeq }
@@ -8,6 +10,10 @@ function entry(path: string, lastSeq: number): OutputEntry {
 
 function visual(path: string, lastSeq: number): OutputEntry {
   return { ...entry(path, lastSeq), kind: 'image' }
+}
+
+function produced(path: string, lastSeq: number, firstTurn: number): OutputEntry {
+  return { ...entry(path, lastSeq), firstTurn, lastTurn: firstTurn }
 }
 
 describe('sidebar output selection', () => {
@@ -58,5 +64,36 @@ describe('sidebar automatic opening', () => {
   it('keeps source and configuration-like text outputs in the tab list without opening', () => {
     expect(shouldAutoOpen(entry('src/app.tsx', 2))).toBe(false)
     expect(shouldAutoOpen({ ...entry('src/app.tsx', 2), kind: 'code' })).toBe(false)
+  })
+
+  it.each(['video', 'audio'] as const)('opens for a new %s output', (kind) => {
+    expect(shouldAutoOpen({ ...entry(`result.${kind}`, 2), kind })).toBe(true)
+  })
+})
+
+describe('sidebar catalog', () => {
+  const entries = [
+    produced('out/final.md', 12, 3),
+    produced('out/chart.png', 9, 2),
+    produced('out/notes.md', 4, 1),
+  ]
+
+  it('groups history by the turn that first produced each output, newest first', () => {
+    expect(groupCatalogByTurn(entries).map(group => [group.turn, group.entries.map(e => e.path)]))
+      .toEqual([[3, ['out/final.md']], [2, ['out/chart.png']], [1, ['out/notes.md']]])
+  })
+
+  it('filters the catalog by file name and path, case-insensitively', () => {
+    expect(filterCatalog(entries, 'CHART').map(entry => entry.path)).toEqual(['out/chart.png'])
+    expect(filterCatalog(entries, 'out/').map(entry => entry.path)).toHaveLength(3)
+    expect(filterCatalog(entries, '   ')).toEqual(entries)
+  })
+
+  it('closes every visible tab at its current revision', () => {
+    expect(closedAllAt(entries)).toEqual({
+      'out/final.md': 12,
+      'out/chart.png': 9,
+      'out/notes.md': 4,
+    })
   })
 })
