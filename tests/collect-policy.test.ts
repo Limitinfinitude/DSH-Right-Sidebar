@@ -61,4 +61,19 @@ describe('output collection product policy', () => {
       { path: 'D:\\outside\\preview.png', seq: 8, publication: 'automatic' },
     ])
   })
+
+  it('ignores stemless extension mentions like `.svg` while naming real files', () => {
+    const startEvent = event('turn/start', 0, { turn: 3 })
+    let state = outputDockDefinition.start({} as never, matched(startEvent), {} as never)
+    const assistant = event('assistant/message', 3, {
+      turn: 3,
+      message: { content: [{ type: 'text', text: '两张图都是 `.svg` 格式，报告见 `report.md`。' }] },
+    }, 'append')
+
+    state = outputDockDefinition.update({ state } as never, matched(assistant))
+
+    expect(state.produced).toEqual([
+      { path: 'report.md', seq: 3, publication: 'automatic' },
+    ])
+  })
 })

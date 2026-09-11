@@ -24,6 +24,20 @@ describe('output product policy', () => {
     expect(outputDisposition(path)).toBe('never')
   })
 
+  it.each(['.svg', '-.svg', '….svg', 'out/.png'])(
+    'never publishes a stemless fragment %s',
+    path => {
+      expect(outputDisposition(path)).toBe('never')
+    },
+  )
+
+  it.each(['图.svg', 'レポート.pdf', 'report.v2.md'])(
+    'keeps non-ASCII and dotted stems publishable: %s',
+    path => {
+      expect(outputDisposition(path)).toBe('automatic')
+    },
+  )
+
   it('publishes conditional files only when the assistant names them', () => {
     expect(mentionedConditionalOutputs([
       { path: 'out/results.json', seq: 4 },

@@ -3,6 +3,19 @@
 All notable changes to DSH Right Sidebar are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses semantic versioning.
 
+## [0.3.1] - 2026-09-12
+
+### Fixed
+
+- SVG previews no longer collapse into a small, offset box in the middle of the stage. The
+  `.dsh-od-media-svg` wrapper now has an explicit size, so the inner `svg` — which sizes itself to
+  `100%`/`100%` — fills the stage and letterboxes correctly instead of falling back to the browser's
+  default replaced-element dimensions.
+- Stemless extension fragments such as `` `.svg` ``, `-.svg`, or `….svg` mentioned in an assistant
+  message no longer enter the outputs catalog as fake entries. `outputDisposition` now requires a
+  name stem with at least one letter or digit (Unicode-aware, so `图.svg` still publishes). Existing
+  bogus entries disappear on the next snapshot rebuild.
+
 ## [0.3.0] - 2026-09-11
 
 ### Added

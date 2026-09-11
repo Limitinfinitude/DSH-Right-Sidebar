@@ -53,6 +53,10 @@ export function outputDisposition(path: string): OutputDisposition {
     return 'never'
   }
   const ext = extension(name)
+  // A name without a stem (`.svg`, `-.svg`, `….svg`) is a fragment the agent
+  // mentioned while talking about a format, never a produced file.
+  const stem = name.slice(0, Math.max(0, name.lastIndexOf('.')))
+  if (!/[\p{L}\p{N}]/u.test(stem)) return 'never'
   if (AUTOMATIC_EXTENSIONS.has(ext)) return 'automatic'
   if (EXPLICIT_EXTENSIONS.has(ext)) return 'explicit'
   return 'never'

@@ -779,6 +779,10 @@ export const DOCK_CSS = `
 
 .dsh-od-media-svg {
   display: grid;
+  /* Explicit size: the inner svg sizes to 100%/100%, so an auto-height wrapper
+     collapses it to the browser's default replaced-element box (offset look). */
+  width: 100%;
+  height: 100%;
   place-items: center;
 }
 
